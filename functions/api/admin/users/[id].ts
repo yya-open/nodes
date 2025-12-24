@@ -15,7 +15,7 @@ export const onRequestPatch: PagesFunction<Env> = async (ctx) => {
   const deny = requireRole(p, "admin");
   if (deny) return deny;
 
-  const id = ctx.params.id as string;
+  const userId= decodeURIComponent(ctx.params.id as string);
   const user = await dbOne<any>(ctx.env.DB, "SELECT id, role FROM users WHERE id = ?", [id]);
   if (!user) return err(404, "用户不存在");
 
@@ -58,7 +58,7 @@ export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
   const deny = requireRole(p, "admin");
   if (deny) return deny;
 
-  const id = ctx.params.id as string;
+  const userId= decodeURIComponent(ctx.params.id as string);
 
   // prevent deleting self
   if (p.authenticated && p.id === id) return err(400, "不能删除当前登录用户");
