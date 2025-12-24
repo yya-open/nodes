@@ -38,7 +38,7 @@ export const onRequestPut: PagesFunction<Env> = async (ctx) => {
   const deny0 = requireAuth(p);
   if (deny0) return deny0;
 
-  const noteId = ctx.params.id as string;
+  const noteId = decodeURIComponent(ctx.params.id as string);
   const { row, deny } = await loadOwnedNote(ctx.env, noteId, p);
   if (deny) return deny;
 
@@ -67,7 +67,7 @@ export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
   const deny0 = requireAuth(p);
   if (deny0) return deny0;
 
-  const noteId = ctx.params.id as string;
+  const noteId = decodeURIComponent(ctx.params.id as string);
   const { deny } = await loadOwnedNote(ctx.env, noteId, p);
   if (deny) return deny;
 
@@ -80,7 +80,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const deny0 = requireAuth(p);
   if (deny0) return deny0;
 
-  const noteId = ctx.params.id as string;
+  const noteId = decodeURIComponent(ctx.params.id as string);
   const { row, deny } = await loadOwnedNote(ctx.env, noteId, p);
   if (deny) return deny;
   return json({ item: fromRow(row) });
