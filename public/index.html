@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>备忘录系统（云同步版）</title>
+  <title>备忘录系统</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -11,13 +11,14 @@
     <div class="brand">
       <div class="logo">📝</div>
       <div>
-        <div class="title">备忘录系统（云同步）</div>
+        <div class="title">备忘录系统</div>
         <div class="subtitle">Cloudflare Pages + D1 · 游客/用户/管理员</div>
       </div>
     </div>
 
     <div class="actions">
       <div id="who" class="who hidden"></div>
+      <button id="btnGuestTools" class="btn hidden">游客工具</button>
       <button id="btnSwitch" class="btn">切换账号</button>
       <button id="btnLogout" class="btn hidden">退出</button>
       <button id="btnNew" class="btn primary">新建</button>
@@ -145,20 +146,60 @@
   </div>
 
   <!-- Admin Users Modal -->
-  <div id="adminMask" class="mask hidden"></div>
+  <div id="guestMask" class="mask hidden"></div>
+  <div id="guestModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalHeader">
+      <div class="modalTitle">游客工具</div>
+      <button id="btnGuestClose" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="hint">
+        <div class="hintTitle">恢复码（换设备继续用游客数据）</div>
+        <div class="hintText">生成一个 15 分钟内有效的一次性恢复码，在另一台设备输入即可接续同一份游客数据。</div>
+        <div class="row">
+          <button id="btnGenGuestCode" class="btn">生成恢复码</button>
+          <input id="guestCodeOut" class="input" placeholder="生成后显示在这里" readonly />
+          <button id="btnCopyGuestCode" class="btn">复制</button>
+        </div>
+        <div class="row">
+          <input id="guestCodeIn" class="input" placeholder="在新设备输入恢复码，例如 G-xxxx" />
+          <button id="btnUseGuestCode" class="btn primary">使用恢复码</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="hint">
+        <div class="hintTitle">游客转正（变成普通账号）</div>
+        <div class="hintText">把当前游客的所有备忘录迁移到新账号下，并自动登录。</div>
+        <div class="row">
+          <input id="upgradeUsername" class="input" placeholder="新用户名（唯一）" />
+          <input id="upgradePasscode" class="input" placeholder="口令（至少6位）" />
+          <button id="btnUpgrade" class="btn primary">转为账号</button>
+        </div>
+      </div>
+
+      <div id="guestMsg" class="smallmuted"></div>
+    </div>
+
+    <div class="modalFooter">
+      <div class="smallmuted">提示：恢复码一次性使用；建议转正后用账号实现真正跨设备同步。</div>
+      <div class="spacer"></div>
+      <button id="btnGuestCancel" class="btn">关闭</button>
+    </div>
+  </div>
+
+
+  <!-- Admin Users Modal -->
+
+<div id="adminMask" class="mask hidden"></div>
   <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modalHeader">
       <div class="modalTitle">用户管理（管理员）</div>
       <button id="btnAdminClose" class="iconBtn" aria-label="关闭">✕</button>
     </div>
     <div class="modalBody">
-      <div class="tabs">
-        <button id="tabAdminUsers" class="tab active">用户</button>
-        <button id="tabAdminNotes" class="tab">备忘录</button>
-      </div>
-
-      <div id="adminUsersPane">
-
       <div class="row">
         <input id="newUsername" class="input" placeholder="新用户名（唯一）" />
         <input id="newPasscode" class="input" placeholder="口令（至少6位）" />
@@ -174,20 +215,7 @@
       <div id="usersList" class="users"></div>
       <div id="usersEmpty" class="smallmuted hidden">暂无用户。</div>
       <div id="adminMsg" class="smallmuted"></div>
-    
-      </div>
-
-      <div id="adminNotesPane" class="hidden">
-        <div class="row">
-          <input id="adminNotesQ" class="input" placeholder="搜索 标题/内容/创建者..." />
-          <button id="btnRefreshNotes" class="btn">刷新</button>
-        </div>
-        <div class="divider"></div>
-        <div id="adminNotesList" class="notesAdmin"></div>
-        <div id="adminNotesEmpty" class="smallmuted hidden">暂无备忘录。</div>
-        <div id="adminNotesMsg" class="smallmuted"></div>
-      </div>
-</div>
+    </div>
     <div class="modalFooter">
       <div class="smallmuted">提示：重置口令会立即生效（旧 token 仍可能在过期前有效）。</div>
       <div class="spacer"></div>

@@ -47,6 +47,7 @@
   const sortEl = $("sort");
 
   const whoEl = $("who");
+  const btnGuestTools = $("btnGuestTools");
   const btnSwitch = $("btnSwitch");
   const btnLogout = $("btnLogout");
   const btnAdmin = $("btnAdmin");
@@ -68,6 +69,19 @@
   const loginUser = $("loginUser");
   const loginPass = $("loginPass");
   const loginMsg = $("loginMsg");
+
+  // guest tools modal
+  const guestMask = $("guestMask");
+  const guestModal = $("guestModal");
+  const closeGuestModal = $("closeGuestModal");
+  const guestCodeVal = $("guestCodeVal");
+  const btnGenRecovery = $("btnGenRecovery");
+  const guestRecoverCode = $("guestRecoverCode");
+  const btnRecover = $("btnRecover");
+  const upgradeUsername = $("upgradeUsername");
+  const upgradePasscode = $("upgradePasscode");
+  const btnUpgrade = $("btnUpgrade");
+  const guestToolsMsg = $("guestToolsMsg");
 
   // admin modal
   const adminMask = $("adminMask");
@@ -95,11 +109,13 @@
     if (!me || !me.authenticated) {
       whoEl.classList.add("hidden");
       btnLogout.classList.add("hidden");
+      btnGuestTools.classList.add("hidden");
       return;
     }
     whoEl.classList.remove("hidden");
     const name = me.username ? me.username : (me.role === "guest" ? "游客" : "用户");
     whoEl.textContent = `${name} · ${me.role}`;
+    btnGuestTools.classList.toggle("hidden", me.role !== "guest");
   }
 
   function openLogin() {
@@ -472,8 +488,7 @@
         btnSave.textContent = "保存";
         btnSave.addEventListener("click", async () => {
           try {
-            const key = u.id || u.username;
-            await api(`/api/admin/users/${encodeURIComponent(key)}`, {
+            await api(`/api/admin/users/${encodeURIComponent(u.id)}`, {
               method: "PATCH",
               body: JSON.stringify({
                 role: roleSel.value,
@@ -494,8 +509,7 @@
           const ok = confirm(`确定删除用户 ${u.username} 吗？`);
           if (!ok) return;
           try {
-            const key = u.id || u.username;
-            await api(`/api/admin/users/${encodeURIComponent(key)}`, { method: "DELETE" });
+            await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "DELETE" });
             adminMsg.textContent = "已删除。";
             await refreshUsers();
           } catch (e) {
@@ -568,7 +582,79 @@
   $("btnLoginCancel").addEventListener("click", closeLogin);
   loginMask.addEventListener("click", closeLogin);
 
-  // admin modal events
+    // guest tools modal events
+  const setGuestMsg = (msg) => {
+    guestToolsMsg.textContent = msg;
+    guestToolsMsg.classList.remove("hidden");
+  };
+
+  const openGuestTools = () => {
+    guestToolsMsg.classList.add("hidden");
+    guestToolsMsg.textContent = "";
+    guestRecoverCode.value = "";
+    upgradeUsername.value = "";
+    upgradePasscode.value = "";
+    guestMask.classList.remove("hidden");
+    guestModal.classList.remove("hidden");
+  };
+
+  const closeGuestTools = () => {
+    guestMask.classList.add("hidden");
+    guestModal.classList.add("hidden");
+  };
+
+  btnGuestTools.addEventListener("click", openGuestTools);
+  closeGuestModal.addEventListener("click", closeGuestTools);
+  guestMask.addEventListener("click", closeGuestTools);
+
+  btnGenRecovery.addEventListener("click", async () => {
+    setGuestMsg("正在生成恢复码...");
+    try {
+      const r = await api("/api/auth/guest/code", { method: "POST" });
+      guestCodeVal.value = r?.code ? String(r.code) : "";
+      setGuestMsg("恢复码已生成，请妥善保存。");
+    } catch (e) {
+      setGuestMsg("生成失败：" + (e?.message || String(e)));
+    }
+  });
+
+  btnRecover.addEventListener("click", async () => {
+    const code = guestRecoverCode.value.trim();
+    if (!code) return setGuestMsg("请输入恢复码。");
+    setGuestMsg("正在恢复...");
+    try {
+      await api("/api/auth/guest/recover", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
+      await refreshMe();
+      await loadNotes();
+      closeGuestTools();
+    } catch (e) {
+      setGuestMsg("恢复失败：" + (e?.message || String(e)));
+    }
+  });
+
+  btnUpgrade.addEventListener("click", async () => {
+    const username = upgradeUsername.value.trim();
+    const passcode = upgradePasscode.value;
+    if (!username) return setGuestMsg("请输入新用户名。");
+    if (!passcode || passcode.length < 6) return setGuestMsg("请输入新口令（至少6位）。");
+    setGuestMsg("正在转正...");
+    try {
+      await api("/api/auth/guest/upgrade", {
+        method: "POST",
+        body: JSON.stringify({ username, passcode }),
+      });
+      await refreshMe();
+      await loadNotes();
+      closeGuestTools();
+    } catch (e) {
+      setGuestMsg("转正失败：" + (e?.message || String(e)));
+    }
+  });
+
+// admin modal events
   btnAdmin.addEventListener("click", openAdmin);
   $("btnAdminClose").addEventListener("click", closeAdmin);
   $("btnAdminCancel").addEventListener("click", closeAdmin);
