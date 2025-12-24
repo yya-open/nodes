@@ -289,3 +289,54 @@ body{
   border:1px solid var(--line);
   color: var(--muted);
 }
+
+
+/* ---- Admin tabs & notes list ---- */
+.tabs{
+  display:flex;
+  gap:8px;
+  margin: 6px 0 12px;
+}
+.tab{
+  padding:8px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: inherit;
+  cursor:pointer;
+}
+.tab.active{
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.18);
+}
+
+.notesAdmin{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.noteAdminCard{
+  border:1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  border-radius:16px;
+  padding:12px 12px;
+}
+.noteAdminTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.noteAdminTitle{
+  font-weight:700;
+}
+.noteAdminMeta{
+  font-size:12px;
+  opacity:.8;
+}
+.noteAdminBody{
+  margin-top:8px;
+  white-space:pre-wrap;
+  opacity:.9;
+  font-size:13px;
+}

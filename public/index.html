@@ -47,7 +47,6 @@
         </select>
 
         <button id="btnAdmin" class="btn hidden">用户管理</button>
-        <button id="btnGuestTools" class="btn hidden">游客工具</button>
       </div>
 
       <div id="stats" class="stats"></div>
@@ -153,6 +152,13 @@
       <button id="btnAdminClose" class="iconBtn" aria-label="关闭">✕</button>
     </div>
     <div class="modalBody">
+      <div class="tabs">
+        <button id="tabAdminUsers" class="tab active">用户</button>
+        <button id="tabAdminNotes" class="tab">备忘录</button>
+      </div>
+
+      <div id="adminUsersPane">
+
       <div class="row">
         <input id="newUsername" class="input" placeholder="新用户名（唯一）" />
         <input id="newPasscode" class="input" placeholder="口令（至少6位）" />
@@ -168,53 +174,24 @@
       <div id="usersList" class="users"></div>
       <div id="usersEmpty" class="smallmuted hidden">暂无用户。</div>
       <div id="adminMsg" class="smallmuted"></div>
-    </div>
+    
+      </div>
+
+      <div id="adminNotesPane" class="hidden">
+        <div class="row">
+          <input id="adminNotesQ" class="input" placeholder="搜索 标题/内容/创建者..." />
+          <button id="btnRefreshNotes" class="btn">刷新</button>
+        </div>
+        <div class="divider"></div>
+        <div id="adminNotesList" class="notesAdmin"></div>
+        <div id="adminNotesEmpty" class="smallmuted hidden">暂无备忘录。</div>
+        <div id="adminNotesMsg" class="smallmuted"></div>
+      </div>
+</div>
     <div class="modalFooter">
       <div class="smallmuted">提示：重置口令会立即生效（旧 token 仍可能在过期前有效）。</div>
       <div class="spacer"></div>
       <button id="btnAdminCancel" class="btn">关闭</button>
-    </div>
-  </div>
-
-
-  <!-- Guest Tools Modal -->
-  <div id="guestMask" class="mask hidden"></div>
-  <div id="guestModal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modalHeader">
-      <div class="modalTitle">游客工具</div>
-      <button id="btnGuestClose" class="iconBtn" aria-label="关闭">✕</button>
-    </div>
-    <div class="modalBody">
-      <div class="smallmuted">用途：换设备继续同一份游客数据，或把游客数据迁移到账号。</div>
-
-      <div class="divider"></div>
-
-      <div class="row">
-        <button id="btnGenGuestCode" class="btn primary">生成恢复码</button>
-        <input id="guestCodeOut" class="input" placeholder="生成后显示（15分钟有效，一次性）" readonly />
-        <button id="btnCopyGuestCode" class="btn">复制</button>
-      </div>
-
-      <div class="row">
-        <input id="guestCodeIn" class="input" placeholder="在新设备输入恢复码（例如 G-...）" />
-        <button id="btnUseGuestCode" class="btn">使用恢复码</button>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="smallmuted">游客转正：创建账号并迁移当前游客的所有备忘录到该账号。</div>
-      <div class="row">
-        <input id="upgradeUsername" class="input" placeholder="新用户名（唯一）" />
-        <input id="upgradePasscode" class="input" placeholder="新口令（至少6位）" />
-        <button id="btnUpgradeGuest" class="btn primary">转为账号</button>
-      </div>
-
-      <div id="guestMsg" class="smallmuted"></div>
-    </div>
-    <div class="modalFooter">
-      <div class="smallmuted">提示：恢复码一次性使用；建议用完立即转为账号，方便多设备云同步。</div>
-      <div class="spacer"></div>
-      <button id="btnGuestCancel" class="btn">关闭</button>
     </div>
   </div>
 
