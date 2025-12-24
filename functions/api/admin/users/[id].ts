@@ -1,107 +1,152 @@
-import type { Env } from "../../../../lib/db";
-import { dbOne, dbRun } from "../../../../lib/db";
-import { json, err } from "../../../../lib/response";
-import { getPrincipal, requireRole } from "../../../../lib/auth";
-import { pbkdf2Hash, randomId } from "../../../../lib/crypto";
+// Admin user management: PATCH (reset passcode / change role) and DELETE (remove user)
+// This file is for Cloudflare Pages Functions: functions/api/admin/users/[id].ts
 
-function decodeId(raw: string) {
+import { getPrincipal, requireRole } from "../../../lib/auth";
+import { pbkdf2Hash, randomId } from "../../../lib/crypto";
+
+function j(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+
+async function readBody(req: Request): Promise<any> {
   try {
-    return decodeURIComponent(raw);
+    const ct = req.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) return {};
+    return await req.json();
   } catch {
-    return raw;
+    return {};
   }
-}
-
-async function userExists(env: Env, id: string) {
-  const r = await dbOne(env.DB, "SELECT id, role, username FROM users WHERE id = ?", [id]);
-  return r?.row || null;
-}
-
-function sanitizeRole(role: any) {
-  if (role === undefined || role === null) return undefined;
-  if (role === "admin" || role === "user") return role as "admin" | "user";
-  return null;
 }
 
 function pickPasscode(body: any): string | undefined {
-  const v =
-    body?.passcode ??
-    body?.newPasscode ??
-    body?.new_passcode ??
-    body?.resetPasscode ??
-    body?.reset_passcode ??
-    body?.pass;
-  return typeof v === "string" ? v : undefined;
+  const keys = ["passcode", "newPasscode", "new_passcode", "resetPasscode", "reset_passcode", "pass"];
+  for (const k of keys) {
+    if (body && typeof body[k] === "string") return body[k];
+  }
+  return undefined;
 }
 
-export const onRequestPatch: PagesFunction<Env> = async (ctx) => {
-  // Make sure any exception becomes JSON rather than a Cloudflare 1101 HTML page
+async function firstRow(env: any, sql: string, binds: any[] = []) {
+  return await env.DB.prepare(sql).bind(...binds).first();
+}
+
+async function exec(env: any, sql: string, binds: any[] = []) {
+  return await env.DB.prepare(sql).bind(...binds).run();
+}
+
+/** key can be either users.id or users.username */
+async function resolveUser(env: any, key: string) {
+  const row = await firstRow(
+    env,
+    `SELECT id, username, role FROM users WHERE id = ?1 OR username = ?1 LIMIT 1`,
+    [key]
+  );
+  return row ? { id: String((row as any).id), username: String((row as any).username), role: String((row as any).role) } : null;
+}
+
+export const onRequestPatch: PagesFunction = async (ctx) => {
   try {
-    const p = await getPrincipal(ctx);
-    if (!p) return err(401, "UNAUTHORIZED");
-    requireRole(p, "admin");
+    const p = await getPrincipal(ctx as any);
+    const deny = requireRole(p, "admin");
+    if (deny) return deny;
 
-    const rawId = String(ctx.params.id ?? "");
-    const id = decodeId(rawId);
+    const rawKey = String((ctx as any).params?.id || "");
+    const key = decodeURIComponent(rawKey);
 
-    const exists = await userExists(ctx.env, id);
-    if (!exists) return err(404, "USER_NOT_FOUND");
+    const target = await resolveUser(ctx.env, key);
+    if (!target) return j({ ok: false, error: "USER_NOT_FOUND" }, 404);
 
-    if (exists.role === "admin" && exists.username === "admin") {
-      return err(400, "CANNOT_EDIT_BOOTSTRAP_ADMIN");
-    }
-
-    let body: any = {};
-    try {
-      // Some clients may send an empty body; treat as {}
-      body = await ctx.request.json();
-    } catch {
-      body = {};
-    }
-
-    const now = Date.now();
-
-    // 1) role update (optional)
-    const role = sanitizeRole(body.role);
-    if (role === null) return err(400, "INVALID_ROLE");
-
-    // 2) passcode reset (optional)
+    const body = await readBody(ctx.request);
+    const nextRole = body?.role;
     const passcode = pickPasscode(body);
-    const wantReset = body?.reset === true || body?.reset_passcode === true || passcode !== undefined;
 
-    if (!wantReset && role === undefined) {
-      return err(400, "NO_CHANGES");
+    if (nextRole === undefined && passcode === undefined) {
+      return j({ ok: false, error: "NO_CHANGES" }, 400);
     }
 
-    // apply updates in a single transaction-like sequence
-    if (role !== undefined) {
-      await dbRun(ctx.env.DB, "UPDATE users SET role = ?, updated_at = ? WHERE id = ?", [role, now, id]);
-    }
+    // Prevent demoting the last admin or demoting yourself from admin.
+    if (nextRole !== undefined) {
+      if (nextRole !== "admin" && nextRole !== "user") return j({ ok: false, error: "INVALID_ROLE" }, 400);
 
-    if (wantReset) {
-      if (!passcode || passcode.length < 6) return err(400, "PASSCODE_TOO_SHORT");
-      const salt = randomId(16);
-      // Cloudflare PBKDF2 iteration limit exists; keep default inside crypto.ts <= 100k.
-      const hash = await pbkdf2Hash(passcode, salt);
-      await dbRun(ctx.env.DB, "UPDATE users SET pass_hash = ?, pass_salt = ?, updated_at = ? WHERE id = ?", [
-        hash,
-        salt,
-        now,
-        id,
+      if (target.id === (p as any).id && nextRole !== "admin") {
+        return j({ ok: false, error: "CANNOT_DEMOTE_SELF" }, 400);
+      }
+      if (target.role === "admin" && nextRole !== "admin") {
+        const otherAdmins = await firstRow(
+          ctx.env,
+          `SELECT COUNT(*) as c FROM users WHERE role='admin' AND id <> ?1`,
+          [target.id]
+        );
+        const c = Number((otherAdmins as any)?.c || 0);
+        if (c <= 0) return j({ ok: false, error: "CANNOT_REMOVE_LAST_ADMIN" }, 400);
+      }
+
+      await exec(ctx.env, `UPDATE users SET role=?1, updated_at=?2 WHERE id=?3`, [
+        nextRole,
+        new Date().toISOString(),
+        target.id,
       ]);
     }
 
-    const updated = await userExists(ctx.env, id);
-    return json({ ok: true, user: updated });
+    if (passcode !== undefined) {
+      const pc = String(passcode);
+      if (pc.length < 6) return j({ ok: false, error: "PASSCODE_TOO_SHORT" }, 400);
+
+      const salt = randomId(16);
+      const hash = await pbkdf2Hash(pc, salt);
+      await exec(ctx.env, `UPDATE users SET pass_salt=?1, pass_hash=?2, updated_at=?3 WHERE id=?4`, [
+        salt,
+        hash,
+        new Date().toISOString(),
+        target.id,
+      ]);
+    }
+
+    return j({ ok: true });
   } catch (e: any) {
-    // Ensure client gets actionable info
-    return json(
-      {
-        ok: false,
-        error: "INTERNAL_ERROR",
-        message: String(e?.message || e),
-      },
-      500
-    );
+    return j({ ok: false, error: "INTERNAL_ERROR", detail: String(e?.message || e) }, 500);
   }
 };
+
+export const onRequestDelete: PagesFunction = async (ctx) => {
+  try {
+    const p = await getPrincipal(ctx as any);
+    const deny = requireRole(p, "admin");
+    if (deny) return deny;
+
+    const rawKey = String((ctx as any).params?.id || "");
+    const key = decodeURIComponent(rawKey);
+
+    const target = await resolveUser(ctx.env, key);
+    if (!target) return j({ ok: false, error: "USER_NOT_FOUND" }, 404);
+
+    // Cannot delete self
+    if (target.id === (p as any).id) return j({ ok: false, error: "CANNOT_DELETE_SELF" }, 400);
+
+    // Cannot delete the last admin
+    if (target.role === "admin") {
+      const otherAdmins = await firstRow(
+        ctx.env,
+        `SELECT COUNT(*) as c FROM users WHERE role='admin' AND id <> ?1`,
+        [target.id]
+      );
+      const c = Number((otherAdmins as any)?.c || 0);
+      if (c <= 0) return j({ ok: false, error: "CANNOT_DELETE_LAST_ADMIN" }, 400);
+    }
+
+    // Clean up notes owned by this user
+    await exec(ctx.env, `DELETE FROM notes WHERE owner_type='user' AND owner_id=?1`, [target.id]);
+    await exec(ctx.env, `DELETE FROM users WHERE id=?1`, [target.id]);
+
+    return j({ ok: true });
+  } catch (e: any) {
+    return j({ ok: false, error: "INTERNAL_ERROR", detail: String(e?.message || e) }, 500);
+  }
+};
+
+// Optional: explicitly disallow GET/POST
+export const onRequestGet: PagesFunction = async () => j({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
+export const onRequestPost: PagesFunction = async () => j({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
