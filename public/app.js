@@ -73,7 +73,7 @@
   // guest tools modal
   const guestMask = $("guestMask");
   const guestModal = $("guestModal");
-  const closeGuestModal = $("closeGuestModal");
+  const closeGuestModal = $("btnGuestClose");
   const guestCodeVal = $("guestCodeVal");
   const btnGenRecovery = $("btnGenRecovery");
   const guestRecoverCode = $("guestRecoverCode");
