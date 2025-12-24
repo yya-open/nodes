@@ -29,7 +29,7 @@ export function randomId(bytes = 16) {
   return b64urlEncode(b);
 }
 
-export async function pbkdf2Hash(passcode: string, saltB64url: string, iterations = 150_000) {
+export async function pbkdf2Hash(passcode: string, saltB64url: string, iterations = 90_000) {
   const salt = b64urlDecodeToBytes(saltB64url);
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
