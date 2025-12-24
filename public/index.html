@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>备忘录系统（云同步版）</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">📝</div>
+      <div>
+        <div class="title">备忘录系统（云同步）</div>
+        <div class="subtitle">Cloudflare Pages + D1 · 游客/用户/管理员</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <div id="who" class="who hidden"></div>
+      <button id="btnSwitch" class="btn">切换账号</button>
+      <button id="btnLogout" class="btn hidden">退出</button>
+      <button id="btnNew" class="btn primary">新建</button>
+      <button id="btnExport" class="btn">导出</button>
+      <label class="btn file">
+        导入
+        <input id="fileImport" type="file" accept="application/json" />
+      </label>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <div class="toolbar">
+        <input id="q" class="input" placeholder="搜索 标题/内容/标签..." />
+        <select id="filter" class="select">
+          <option value="all">全部</option>
+          <option value="active">未完成</option>
+          <option value="done">已完成</option>
+          <option value="pinned">置顶</option>
+        </select>
+        <select id="sort" class="select">
+          <option value="updated_desc">按更新时间（新→旧）</option>
+          <option value="updated_asc">按更新时间（旧→新）</option>
+          <option value="created_desc">按创建时间（新→旧）</option>
+          <option value="created_asc">按创建时间（旧→新）</option>
+        </select>
+
+        <button id="btnAdmin" class="btn hidden">用户管理</button>
+      </div>
+
+      <div id="stats" class="stats"></div>
+
+      <div id="list" class="list"></div>
+      <div id="empty" class="empty hidden">
+        <div class="emptyTitle">还没有备忘录</div>
+        <div class="emptyHint">点击右上角「新建」开始记录。</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Memo Modal -->
+  <div id="modalMask" class="mask hidden"></div>
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalHeader">
+      <div id="modalTitle" class="modalTitle">新建备忘录</div>
+      <button id="btnClose" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+
+    <div class="modalBody">
+      <label class="field">
+        <div class="label">标题</div>
+        <input id="mTitle" class="input" maxlength="80" placeholder="例如：明天买牛奶" />
+      </label>
+
+      <label class="field">
+        <div class="label">内容</div>
+        <textarea id="mBody" class="textarea" rows="8" placeholder="写点详细内容..."></textarea>
+      </label>
+
+      <label class="field">
+        <div class="label">标签（逗号分隔）</div>
+        <input id="mTags" class="input" placeholder="例如：工作, 计划, 灵感" />
+      </label>
+
+      <div class="row">
+        <label class="check">
+          <input id="mDone" type="checkbox" />
+          <span>已完成</span>
+        </label>
+        <label class="check">
+          <input id="mPinned" type="checkbox" />
+          <span>置顶</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="modalFooter">
+      <button id="btnDelete" class="btn danger hidden">删除</button>
+      <div class="spacer"></div>
+      <button id="btnCancel" class="btn">取消</button>
+      <button id="btnSave" class="btn primary">保存</button>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="loginMask" class="mask hidden"></div>
+  <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalHeader">
+      <div class="modalTitle">登录</div>
+      <button id="btnLoginClose" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="hint">
+        <div class="hintTitle">游客模式</div>
+        <div class="hintText">无需账号，数据也会云端保存（只对当前游客可见）。</div>
+        <button id="btnGuest" class="btn primary">以游客身份继续</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <label class="field">
+        <div class="label">用户名</div>
+        <input id="loginUser" class="input" autocomplete="username" placeholder="例如：alice" />
+      </label>
+      <label class="field">
+        <div class="label">口令（Passcode）</div>
+        <input id="loginPass" class="input" type="password" autocomplete="current-password" placeholder="输入口令" />
+      </label>
+
+      <div class="row">
+        <button id="btnLogin" class="btn primary">登录</button>
+        <div class="smallmuted">管理员可在「用户管理」中创建/重置用户口令。</div>
+      </div>
+
+      <div id="loginMsg" class="smallmuted"></div>
+    </div>
+
+    <div class="modalFooter">
+      <div class="smallmuted">首次部署：可用环境变量 ADMIN_BOOTSTRAP_USER / ADMIN_BOOTSTRAP_PASSCODE 引导创建管理员。</div>
+      <div class="spacer"></div>
+      <button id="btnLoginCancel" class="btn">关闭</button>
+    </div>
+  </div>
+
+  <!-- Admin Users Modal -->
+  <div id="adminMask" class="mask hidden"></div>
+  <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalHeader">
+      <div class="modalTitle">用户管理（管理员）</div>
+      <button id="btnAdminClose" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+    <div class="modalBody">
+      <div class="row">
+        <input id="newUsername" class="input" placeholder="新用户名（唯一）" />
+        <input id="newPasscode" class="input" placeholder="口令（至少6位）" />
+        <select id="newRole" class="select">
+          <option value="user">普通用户</option>
+          <option value="admin">管理员</option>
+        </select>
+        <button id="btnCreateUser" class="btn primary">创建</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="usersList" class="users"></div>
+      <div id="usersEmpty" class="smallmuted hidden">暂无用户。</div>
+      <div id="adminMsg" class="smallmuted"></div>
+    </div>
+    <div class="modalFooter">
+      <div class="smallmuted">提示：重置口令会立即生效（旧 token 仍可能在过期前有效）。</div>
+      <div class="spacer"></div>
+      <button id="btnAdminCancel" class="btn">关闭</button>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "memo-cloud",
+  "private": true,
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public"
+  }
+}

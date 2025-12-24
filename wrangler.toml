@@ -1,0 +1,14 @@
+# Cloudflare Pages + Functions 配置
+# 参考：Pages Functions 的 wrangler 配置文档
+# 你需要把 database_id 替换为自己账户创建的 D1 数据库 UUID
+
+name = "memo-cloud"
+compatibility_date = "2025-12-01"
+pages_build_output_dir = "public"
+
+# D1 绑定：Functions 中可通过 env.DB 访问
+[[d1_databases]]
+binding = "DB"
+database_name = "memo-cloud-db"
+database_id = "fb43f683-baff-484c-89ba-bafc82da0e6e"
+migrations_dir = "migrations"
