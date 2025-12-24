@@ -1,13 +1,18 @@
 import type { Env } from "../../../lib/db";
 import { dbOne, dbRun } from "../../../lib/db";
-import { json, err, readJson } from "../../../lib/response";
+import { json, err } from "../../../lib/response";
 import { getPrincipal, requireRole } from "../../../lib/auth";
 import { pbkdf2Hash, randomId } from "../../../lib/crypto";
 
-function sanitizeRole(role: string | undefined) {
-  if (!role) return undefined;
-  if (role === "admin" || role === "user") return role;
+function sanitizeRole(role: any) {
+  if (role === undefined || role === null) return undefined;
+  if (role === "admin" || role === "user") return role as "admin" | "user";
   return null;
+}
+
+async function userExists(env: Env, id: string) {
+  const r = await dbOne(env.DB, "SELECT id, role FROM users WHERE id = ?", [id]);
+  return r?.row || null;
 }
 
 export const onRequestPatch: PagesFunction<Env> = async (ctx) => {
@@ -15,40 +20,56 @@ export const onRequestPatch: PagesFunction<Env> = async (ctx) => {
   const deny = requireRole(p, "admin");
   if (deny) return deny;
 
-  const userId= decodeURIComponent(ctx.params.id as string);
-  const user = await dbOne<any>(ctx.env.DB, "SELECT id, role FROM users WHERE id = ?", [id]);
-  if (!user) return err(404, "用户不存在");
+  const id = decodeURIComponent(ctx.params.id as string);
 
-  const body = await readJson<any>(ctx.request);
+  // Parse body safely
+  let body: any = {};
+  try {
+    body = await ctx.request.json();
+  } catch {
+    body = {};
+  }
+
   const role = sanitizeRole(body.role);
-  if (role === null) return err(400, "role 必须是 admin 或 user");
+  const passcodeRaw = body.passcode;
 
-  const passcode = body.passcode !== undefined ? String(body.passcode || "").trim() : undefined;
-  if (passcode !== undefined && passcode.length > 0 && passcode.length < 6) return err(400, "口令至少6位");
-
-  const updates: string[] = [];
-  const params: any[] = [];
-
-  if (role) {
-    updates.push("role = ?");
-    params.push(role);
-  }
-  if (passcode && passcode.length >= 6) {
-    const salt = randomId(18);
-    const hash = await pbkdf2Hash(passcode, salt);
-    updates.push("pass_salt = ?");
-    updates.push("pass_hash = ?");
-    params.push(salt, hash);
+  if (role === null) return err(400, "无效角色");
+  if (passcodeRaw !== undefined && passcodeRaw !== null) {
+    const passcode = String(passcodeRaw);
+    if (passcode.length < 6) return err(400, "口令至少 6 位");
   }
 
-  if (updates.length === 0) return err(400, "没有可更新的字段");
+  if (role === undefined && (passcodeRaw === undefined || passcodeRaw === null || String(passcodeRaw).length === 0)) {
+    return err(400, "未提供更新字段");
+  }
 
-  updates.push("updated_at = ?");
-  params.push(new Date().toISOString());
+  const u = await userExists(ctx.env, id);
+  if (!u) return err(404, "未找到用户");
 
-  params.push(id);
+  // Prevent accidentally demoting last admin
+  if (role && role !== u.role) {
+    if (u.role === "admin" && role !== "admin") {
+      const cnt = await dbOne(ctx.env.DB, "SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND id != ?", [id]);
+      const c = Number(cnt?.row?.c || 0);
+      if (c <= 0) return err(400, "至少需要保留 1 个管理员");
+    }
+  }
 
-  await dbRun(ctx.env.DB, `UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
+  const now = new Date().toISOString();
+
+  if (role !== undefined) {
+    await dbRun(ctx.env.DB, "UPDATE users SET role = ?, updated_at = ? WHERE id = ?", [role, now, id]);
+  }
+
+  if (passcodeRaw !== undefined && passcodeRaw !== null && String(passcodeRaw).length > 0) {
+    const salt = randomId(16);
+    const hash = await pbkdf2Hash(String(passcodeRaw), salt);
+    await dbRun(
+      ctx.env.DB,
+      "UPDATE users SET pass_salt = ?, pass_hash = ?, updated_at = ? WHERE id = ?",
+      [salt, hash, now, id]
+    );
+  }
 
   return json({ ok: true });
 };
@@ -58,14 +79,23 @@ export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
   const deny = requireRole(p, "admin");
   if (deny) return deny;
 
-  const userId= decodeURIComponent(ctx.params.id as string);
+  const id = decodeURIComponent(ctx.params.id as string);
 
-  // prevent deleting self
-  if (p.authenticated && p.id === id) return err(400, "不能删除当前登录用户");
+  if (p.authenticated && id === p.id) return err(400, "不能删除当前登录用户");
 
-  const r = await dbRun(ctx.env.DB, "DELETE FROM users WHERE id = ?", [id]);
-  // optionally: also delete user's notes
-  await dbRun(ctx.env.DB, "DELETE FROM notes WHERE owner_id = ?", [id]);
+  const u = await userExists(ctx.env, id);
+  if (!u) return err(404, "未找到用户");
+
+  // Prevent deleting the last admin
+  if (u.role === "admin") {
+    const cnt = await dbOne(ctx.env.DB, "SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND id != ?", [id]);
+    const c = Number(cnt?.row?.c || 0);
+    if (c <= 0) return err(400, "至少需要保留 1 个管理员");
+  }
+
+  // Delete user's notes first (only user-owned)
+  await dbRun(ctx.env.DB, "DELETE FROM notes WHERE owner_type = 'user' AND owner_id = ?", [id]);
+  await dbRun(ctx.env.DB, "DELETE FROM users WHERE id = ?", [id]);
 
   return json({ ok: true });
 };
