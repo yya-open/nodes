@@ -16,8 +16,10 @@ export const onRequestPatch: PagesFunction<Env> = async (ctx) => {
   if (deny) return deny;
 
   const id = ctx.params.id as string;
-  const user = await dbOne<any>(ctx.env.DB, "SELECT id, role FROM users WHERE id = ?", [id]);
+  const user = await dbOne<any>(ctx.env.DB, "SELECT id, role FROM users WHERE id = ? OR username = ? LIMIT 1", [id, id]);
   if (!user) return err(404, "用户不存在");
+
+  const userId = String(user.id);
 
   const body = await readJson<any>(ctx.request);
   const role = sanitizeRole(body.role);
@@ -46,7 +48,7 @@ export const onRequestPatch: PagesFunction<Env> = async (ctx) => {
   updates.push("updated_at = ?");
   params.push(new Date().toISOString());
 
-  params.push(id);
+  params.push(userId);
 
   await dbRun(ctx.env.DB, `UPDATE users SET ${updates.join(", ")} WHERE id = ?`, params);
 
