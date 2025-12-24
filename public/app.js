@@ -79,18 +79,6 @@
   const newPasscode = $("newPasscode");
   const newRole = $("newRole");
 
-  const tabAdminUsers = $("tabAdminUsers");
-  const tabAdminNotes = $("tabAdminNotes");
-  const adminUsersPane = $("adminUsersPane");
-  const adminNotesPane = $("adminNotesPane");
-  const adminNotesList = $("adminNotesList");
-  const adminNotesEmpty = $("adminNotesEmpty");
-  const adminNotesMsg = $("adminNotesMsg");
-  const adminNotesQ = $("adminNotesQ");
-  const btnRefreshNotes = $("btnRefreshNotes");
-  let adminNotesLoaded = false;
-
-
   // ---- auth
   async function refreshMe() {
     try {
@@ -440,7 +428,6 @@
     adminMsg.textContent = "";
     adminMask.classList.remove("hidden");
     adminModal.classList.remove("hidden");
-    setAdminTab("users");
     refreshUsers();
   }
   function closeAdmin() {
@@ -485,7 +472,8 @@
         btnSave.textContent = "保存";
         btnSave.addEventListener("click", async () => {
           try {
-            await api(`/api/admin/users/${encodeURIComponent(u.id)}`, {
+            const key = u.username || u.id;
+            await api(`/api/admin/users/${encodeURIComponent(key)}`, {
               method: "PATCH",
               body: JSON.stringify({
                 role: roleSel.value,
@@ -506,7 +494,8 @@
           const ok = confirm(`确定删除用户 ${u.username} 吗？`);
           if (!ok) return;
           try {
-            await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "DELETE" });
+            const key = u.username || u.id;
+            await api(`/api/admin/users/${encodeURIComponent(key)}`, { method: "DELETE" });
             adminMsg.textContent = "已删除。";
             await refreshUsers();
           } catch (e) {
@@ -529,68 +518,7 @@
     }
   }
 
-  
-  function setAdminTab(which) {
-    if (!tabAdminUsers || !tabAdminNotes) return;
-    const users = which === "users";
-    tabAdminUsers.classList.toggle("active", users);
-    tabAdminNotes.classList.toggle("active", !users);
-    if (adminUsersPane) adminUsersPane.classList.toggle("hidden", !users);
-    if (adminNotesPane) adminNotesPane.classList.toggle("hidden", users);
-    if (!users && !adminNotesLoaded) refreshAdminNotes();
-  }
-
-  async function refreshAdminNotes() {
-    if (!adminNotesMsg) return;
-    adminNotesMsg.textContent = "加载中...";
-    try {
-      const q = (adminNotesQ?.value || "").trim();
-      const url = q ? `/api/admin/notes?q=${encodeURIComponent(q)}` : "/api/admin/notes";
-      const data = await api(url, { method: "GET" });
-      const items = data.items || [];
-      adminNotesLoaded = true;
-
-      if (adminNotesList) adminNotesList.innerHTML = "";
-      if (adminNotesEmpty) adminNotesEmpty.classList.toggle("hidden", items.length !== 0);
-
-      for (const it of items) {
-        const card = document.createElement("div");
-        card.className = "noteAdminCard";
-
-        const top = document.createElement("div");
-        top.className = "noteAdminTop";
-
-        const title = document.createElement("div");
-        title.className = "noteAdminTitle";
-        title.textContent = it.title || "(无标题)";
-
-        const meta = document.createElement("div");
-        meta.className = "noteAdminMeta";
-        const owner = it.ownerUsername
-          ? it.ownerUsername
-          : (it.ownerType === "guest" ? "guest" : it.ownerId);
-        meta.textContent = `创建者：${owner} · 更新：${formatTime(it.updatedAt)}`;
-
-        top.appendChild(title);
-        top.appendChild(meta);
-
-        const body = document.createElement("div");
-        body.className = "noteAdminBody";
-        body.textContent = String(it.body || "").slice(0, 200);
-
-        card.appendChild(top);
-        card.appendChild(body);
-
-        adminNotesList?.appendChild(card);
-      }
-      adminNotesMsg.textContent = items.length ? `共 ${items.length} 条（最多显示 1000 条）` : "";
-    } catch (e) {
-      adminNotesMsg.textContent = `加载失败：${e.message}`;
-    }
-  }
-
-
-async function createUser() {
+  async function createUser() {
     const u = (newUsername.value || "").trim();
     const p = (newPasscode.value || "").trim();
     const r = newRole.value;
@@ -646,12 +574,6 @@ async function createUser() {
   $("btnAdminCancel").addEventListener("click", closeAdmin);
   adminMask.addEventListener("click", closeAdmin);
   $("btnCreateUser").addEventListener("click", createUser);
-
-  // admin tabs
-  tabAdminUsers?.addEventListener("click", () => setAdminTab("users"));
-  tabAdminNotes?.addEventListener("click", () => setAdminTab("notes"));
-  btnRefreshNotes?.addEventListener("click", refreshAdminNotes);
-
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
