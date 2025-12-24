@@ -50,6 +50,7 @@
   const btnSwitch = $("btnSwitch");
   const btnLogout = $("btnLogout");
   const btnAdmin = $("btnAdmin");
+  const btnGuestTools = $("btnGuestTools");
 
   // memo modal
   const maskEl = $("modalMask");
@@ -79,6 +80,22 @@
   const newPasscode = $("newPasscode");
   const newRole = $("newRole");
 
+
+  // guest tools modal
+  const guestMask = $("guestMask");
+  const guestModal = $("guestModal");
+  const btnGuestClose = $("btnGuestClose");
+  const btnGuestCancel = $("btnGuestCancel");
+  const btnGenGuestCode = $("btnGenGuestCode");
+  const guestCodeOut = $("guestCodeOut");
+  const btnCopyGuestCode = $("btnCopyGuestCode");
+  const guestCodeIn = $("guestCodeIn");
+  const btnUseGuestCode = $("btnUseGuestCode");
+  const upgradeUsername = $("upgradeUsername");
+  const upgradePasscode = $("upgradePasscode");
+  const btnUpgradeGuest = $("btnUpgradeGuest");
+  const guestMsg = $("guestMsg");
+
   // ---- auth
   async function refreshMe() {
     try {
@@ -88,6 +105,7 @@
     }
     renderWho();
     btnAdmin.classList.toggle("hidden", me.role !== "admin");
+    btnGuestTools.classList.toggle("hidden", me.role !== "guest");
     btnLogout.classList.toggle("hidden", !me.authenticated);
   }
 
@@ -423,6 +441,92 @@
     await loadNotes();
   }
 
+  // ---- Guest Tools UI
+  function openGuestTools() {
+    guestMsg.textContent = "";
+    guestCodeOut.value = "";
+    guestCodeIn.value = "";
+    upgradeUsername.value = "";
+    upgradePasscode.value = "";
+    guestMask.classList.remove("hidden");
+    guestModal.classList.remove("hidden");
+    setTimeout(() => guestCodeIn.focus(), 0);
+  }
+  function closeGuestTools() {
+    guestMask.classList.add("hidden");
+    guestModal.classList.add("hidden");
+  }
+
+  async function genGuestCode() {
+    guestMsg.textContent = "生成中...";
+    try {
+      const r = await api("/api/auth/guest/code", { method: "POST" });
+      guestCodeOut.value = r.code;
+      guestMsg.textContent = `恢复码已生成（15分钟有效，一次性）。到期时间：${r.expiresAt}`;
+    } catch (e) {
+      guestMsg.textContent = `生成失败：${e.message || e}`;
+    }
+  }
+
+  async function useGuestCode() {
+    const code = (guestCodeIn.value || "").trim();
+    if (!code) {
+      guestMsg.textContent = "请输入恢复码。";
+      return;
+    }
+    guestMsg.textContent = "使用中...";
+    try {
+      await api("/api/auth/guest/recover", { method: "POST", body: JSON.stringify({ code }) });
+      await refreshMe();
+      await loadNotes();
+      closeGuestTools();
+    } catch (e) {
+      guestMsg.textContent = `使用失败：${e.message || e}`;
+    }
+  }
+
+  async function upgradeGuestToUser() {
+    const u = (upgradeUsername.value || "").trim();
+    const p = (upgradePasscode.value || "").trim();
+    if (!u || !p) {
+      guestMsg.textContent = "请输入新用户名和口令。";
+      return;
+    }
+    if (p.length < 6) {
+      guestMsg.textContent = "口令至少 6 位。";
+      return;
+    }
+    guestMsg.textContent = "迁移中...";
+    try {
+      await api("/api/auth/guest/upgrade", { method: "POST", body: JSON.stringify({ username: u, passcode: p }) });
+      await refreshMe();
+      await loadNotes();
+      closeGuestTools();
+    } catch (e) {
+      guestMsg.textContent = `转正失败：${e.message || e}`;
+    }
+  }
+
+  async function copyGuestCode() {
+    const code = (guestCodeOut.value || "").trim();
+    if (!code) {
+      guestMsg.textContent = "请先生成恢复码。";
+      return;
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        guestCodeOut.focus();
+        guestCodeOut.select();
+        document.execCommand("copy");
+      }
+      guestMsg.textContent = "已复制到剪贴板。";
+    } catch (e) {
+      guestMsg.textContent = `复制失败：${e.message || e}`;
+    }
+  }
+
   // ---- Admin UI
   function openAdmin() {
     adminMsg.textContent = "";
@@ -568,7 +672,16 @@
 
   // admin modal events
   btnAdmin.addEventListener("click", openAdmin);
-  $("btnAdminClose").addEventListener("click", closeAdmin);
+  
+  btnGuestTools.addEventListener("click", openGuestTools);
+  btnGuestClose.addEventListener("click", closeGuestTools);
+  btnGuestCancel.addEventListener("click", closeGuestTools);
+  guestMask.addEventListener("click", closeGuestTools);
+  btnGenGuestCode.addEventListener("click", genGuestCode);
+  btnCopyGuestCode.addEventListener("click", copyGuestCode);
+  btnUseGuestCode.addEventListener("click", useGuestCode);
+  btnUpgradeGuest.addEventListener("click", upgradeGuestToUser);
+$("btnAdminClose").addEventListener("click", closeAdmin);
   $("btnAdminCancel").addEventListener("click", closeAdmin);
   adminMask.addEventListener("click", closeAdmin);
   $("btnCreateUser").addEventListener("click", createUser);
