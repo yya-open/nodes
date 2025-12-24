@@ -70,27 +70,24 @@
   const loginPass = $("loginPass");
   const loginMsg = $("loginMsg");
 
-  const pick = (...candidates) => {
-    for (const id of candidates) {
-      const el = $(id);
-      if (el) return el;
-    }
-    return null;
-  };
-
-  // guest tools modal
+  // guest tools modal (ids come from index.html)
   const guestMask = $("guestMask");
   const guestModal = $("guestModal");
-  const closeGuestModal = pick("closeGuestModal", "btnGuestClose", "btnGuestCancel");
-  const guestCodeVal = pick("guestCodeVal", "guestCodeOut");
-  const btnGenRecovery = pick("btnGenRecovery", "btnGenGuestCode");
-  const btnCopyRecovery = pick("btnCopyRecovery", "btnCopyGuestCode");
-  const guestRecoverCode = pick("guestRecoverCode", "guestCodeIn");
-  const btnRecover = pick("btnRecover", "btnUseGuestCode");
+  const closeGuestModal = $("btnGuestClose");
+
+  // recovery
+  const guestCodeVal = $("guestCodeOut");
+  const btnGenRecovery = $("btnGenGuestCode");
+  const btnCopyRecovery = $("btnCopyGuestCode");
+  const guestRecoverCode = $("guestCodeIn");
+  const btnRecover = $("btnUseGuestCode");
+
+  // upgrade
   const upgradeUsername = $("upgradeUsername");
   const upgradePasscode = $("upgradePasscode");
   const btnUpgrade = $("btnUpgrade");
-  const guestToolsMsg = $("guestToolsMsg");
+
+  const guestToolsMsg = $("guestMsg");
 
   // admin modal
   const adminMask = $("adminMask");
@@ -600,9 +597,9 @@
   const openGuestTools = () => {
     guestToolsMsg.classList.add("hidden");
     guestToolsMsg.textContent = "";
-    guestRecoverCode && (guestRecoverCode.value = "");
-    upgradeUsername && (upgradeUsername.value = "");
-    upgradePasscode && (upgradePasscode.value = "");
+    guestRecoverCode.value = "";
+    upgradeUsername.value = "";
+    upgradePasscode.value = "";
     guestMask.classList.remove("hidden");
     guestModal.classList.remove("hidden");
   };
@@ -612,11 +609,34 @@
     guestModal.classList.add("hidden");
   };
 
-  btnGuestTools && btnGuestTools.addEventListener("click", openGuestTools);
-  closeGuestModal && closeGuestModal.addEventListener("click", closeGuestTools);
-  guestMask && guestMask.addEventListener("click", closeGuestTools);
+  // Bind guest tools events defensively (the guest tools UI may be removed in custom builds)
+  if (btnGuestTools && guestMask && guestModal) {
+    btnGuestTools.addEventListener("click", openGuestTools);
+    guestMask.addEventListener("click", closeGuestTools);
+    if (closeGuestModal) closeGuestModal.addEventListener("click", closeGuestTools);
+    const btnGuestCancel = $("btnGuestCancel");
+    if (btnGuestCancel) btnGuestCancel.addEventListener("click", closeGuestTools);
+  }
 
-  btnGenRecovery && btnGenRecovery.addEventListener("click", async () => {
+  const btnCopyGuestCode = $("btnCopyGuestCode");
+  if (btnCopyGuestCode && guestCodeVal) {
+    btnCopyGuestCode.addEventListener("click", async () => {
+      const v = String(guestCodeVal.value || "").trim();
+      if (!v) return setGuestMsg("没有可复制的恢复码。");
+      try {
+        await navigator.clipboard.writeText(v);
+        setGuestMsg("已复制到剪贴板。");
+      } catch {
+        // Fallback for non-secure contexts
+        guestCodeVal.focus();
+        guestCodeVal.select();
+        document.execCommand?.("copy");
+        setGuestMsg("已尝试复制（若失败请手动复制）。");
+      }
+    });
+  }
+
+  if (btnGenRecovery) btnGenRecovery.addEventListener("click", async () => {
     setGuestMsg("正在生成恢复码...");
     try {
       const r = await api("/api/auth/guest/code", { method: "POST" });
@@ -627,20 +647,8 @@
     }
   });
 
-  btnCopyRecovery && btnCopyRecovery.addEventListener("click", async () => {
-    const v = guestCodeVal?.value || "";
-    if (!v) return guestToolsMsg("先生成恢复码");
-    try {
-      await navigator.clipboard.writeText(v);
-      guestToolsMsg("已复制");
-    } catch {
-      guestToolsMsg("复制失败");
-    }
-  });
-
-
-  btnRecover && btnRecover.addEventListener("click", async () => {
-    const code = guestRecoverCode?.value?.trim();
+  if (btnRecover) btnRecover.addEventListener("click", async () => {
+    const code = guestRecoverCode.value.trim();
     if (!code) return setGuestMsg("请输入恢复码。");
     setGuestMsg("正在恢复...");
     try {
@@ -656,9 +664,9 @@
     }
   });
 
-  btnUpgrade && btnUpgrade.addEventListener("click", async () => {
-    const username = upgradeUsername?.value?.trim();
-    const passcode = upgradePasscode?.value || "";
+  if (btnUpgrade) btnUpgrade.addEventListener("click", async () => {
+    const username = upgradeUsername.value.trim();
+    const passcode = upgradePasscode.value;
     if (!username) return setGuestMsg("请输入新用户名。");
     if (!passcode || passcode.length < 6) return setGuestMsg("请输入新口令（至少6位）。");
     setGuestMsg("正在转正...");
