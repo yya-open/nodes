@@ -472,7 +472,7 @@
         btnSave.textContent = "保存";
         btnSave.addEventListener("click", async () => {
           try {
-            const key = u.username || u.id;
+            const key = u.id || u.username;
             await api(`/api/admin/users/${encodeURIComponent(key)}`, {
               method: "PATCH",
               body: JSON.stringify({
@@ -494,7 +494,7 @@
           const ok = confirm(`确定删除用户 ${u.username} 吗？`);
           if (!ok) return;
           try {
-            const key = u.username || u.id;
+            const key = u.id || u.username;
             await api(`/api/admin/users/${encodeURIComponent(key)}`, { method: "DELETE" });
             adminMsg.textContent = "已删除。";
             await refreshUsers();
