@@ -878,27 +878,31 @@ async function refreshAdminNotes() {
   }
 
   async function createShareLink() {
-    if (!editingId) return;
-    if (shareMsgEl) shareMsgEl.textContent = "生成中...";
+    if (!shareForMemoId) return;
+    const burn = !!(shareBurn && shareBurn.checked);
+    const hoursRaw = (shareExpireHours && shareExpireHours.value) ? String(shareExpireHours.value).trim() : "";
+    const expireHours = hoursRaw ? Number(hoursRaw) : 0;
+    if (hoursRaw && (!Number.isFinite(expireHours) || expireHours < 0)) {
+      shareMsg.textContent = "有效期请输入非负数字（小时）。";
+      return;
+    }
+    shareMsg.textContent = "生成中...";
     try {
-      const burnAfterRead = !!shareBurnEl?.checked;
-      const hours = Number((shareExpHoursEl?.value || "").trim() || 0);
-      const expiresInSeconds = hours > 0 ? Math.floor(hours * 3600) : 0;
-
       const data = await api("/api/share/create", {
         method: "POST",
-        body: JSON.stringify({ noteId: editingId, burnAfterRead, expiresInSeconds }),
+        body: JSON.stringify({
+          memoId: shareForMemoId,
+          burnAfterRead: burn,
+          expireHours: expireHours || 0,
+        }),
       });
-
-      if (shareUrlEl) shareUrlEl.value = data.url || "";
-      if (shareMsgEl) {
-        const extra = [];
-        if (data.burnAfterRead) extra.push("阅后即焚");
-        if (data.expiresAt) extra.push("有效期至 " + String(data.expiresAt).replace("T", " ").replace("Z", ""));
-        shareMsgEl.textContent = "已生成。" + (extra.length ? "（" + extra.join("，") + "）" : "");
-      }
+      // data: { url } or { token } depending on backend
+      const url = data.url || (data.token ? (location.origin + "/share.html?token=" + encodeURIComponent(data.token)) : "");
+      if (!url) throw new Error("后端未返回分享链接。");
+      shareLink.value = url;
+      shareMsg.textContent = "已生成。";
     } catch (e) {
-      if (shareMsgEl) shareMsgEl.textContent = `生成失败：${e.message || e}`;
+      shareMsg.textContent = `生成失败：${e.message || e}`;
     }
   }
 
