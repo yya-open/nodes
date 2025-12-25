@@ -24,17 +24,24 @@
 (async () => {
   const qs = new URLSearchParams(location.search);
   const token = qs.get("token");
+  const hashCode = (location.hash || "").replace(/^#/, "");
+  const code = token || hashCode;
+
   const msg = document.getElementById("msg");
-  if (!token) { msg.textContent = "缺少 token。"; return; }
+  if (!code) { msg.textContent = "缺少 token/code。"; return; }
 
   try {
-    const res = await fetch("/api/share/open?token=" + encodeURIComponent(token), { credentials: "include" });
+    const res = await fetch("/api/share/" + encodeURIComponent(code), { credentials: "include" });
     const ct = res.headers.get("content-type") || "";
     const data = ct.includes("application/json") ? await res.json() : { error: await res.text() };
     if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
-    document.getElementById("title").textContent = data.title || "(无标题)";
-    document.getElementById("content").textContent = data.content || "";
-    document.getElementById("meta").textContent = data.burnAfterRead ? "阅后即焚链接：打开一次后失效" : "普通分享链接";
+
+    // 适配后端返回：{ note: {title, body...}, meta: {burned...} }
+    document.getElementById("title").textContent = data.note?.title || "(无标题)";
+    document.getElementById("content").textContent = data.note?.body || "";
+
+    const burned = !!data.meta?.burned;
+    document.getElementById("meta").textContent = burned ? "阅后即焚链接：打开一次后失效" : "普通分享链接";
     msg.textContent = "已加载。";
   } catch (e) {
     msg.textContent = "加载失败：" + (e.message || e);

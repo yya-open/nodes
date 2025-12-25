@@ -891,7 +891,7 @@ async function refreshAdminNotes() {
       const data = await api("/api/share/create", {
         method: "POST",
         body: JSON.stringify({
-          memoId: shareForMemoId,
+          noteId: shareForMemoId,
           burnAfterRead: burn,
           expireHours: expireHours || 0,
         }),
