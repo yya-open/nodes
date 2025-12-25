@@ -17,12 +17,11 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const url = new URL(ctx.request.url);
   const limitRaw = Number(url.searchParams.get("limit") || "50");
   const offsetRaw = Number(url.searchParams.get("offset") || "0");
+  const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 50, 1), 1000);
+  const offset = Math.max(Number.isFinite(offsetRaw) ? Math.floor(offsetRaw) : 0, 0);
 
-  const limit = Math.max(1, Math.min(1000, Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 50));
-  const offset = Math.max(0, Number.isFinite(offsetRaw) ? Math.floor(offsetRaw) : 0);
-
-  const totalRow = await dbOne<any>(ctx.env.DB, "SELECT COUNT(*) as c FROM users");
-  const total = Number(totalRow?.c || 0);
+  const totalRow = await dbOne<any>(ctx.env.DB, "SELECT COUNT(*) as cnt FROM users");
+  const total = Number(totalRow?.cnt || 0);
 
   const items = await dbAll<any>(
     ctx.env.DB,
@@ -30,23 +29,24 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     [limit, offset]
   );
 
+  const mapped = items.map((u) => ({
+    id: String(u.id),
+    username: String(u.username),
+    role: String(u.role),
+    createdAt: String(u.created_at),
+    updatedAt: String(u.updated_at),
+  }));
+
   return json({
-    items: items.map((u) => ({
-      id: String(u.id),
-      username: String(u.username),
-      role: String(u.role),
-      createdAt: String(u.created_at),
-      updatedAt: String(u.updated_at),
-    })),
+    items: mapped,
     page: {
       limit,
       offset,
       total,
-      hasMore: offset + items.length < total,
+      hasMore: offset + mapped.length < total,
     },
   });
 };
-
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const p = await getPrincipal(ctx);

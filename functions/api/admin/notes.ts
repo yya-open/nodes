@@ -1,5 +1,5 @@
 import type { Env } from "../../lib/db";
-import { dbAll, dbOne } from "../../lib/db";
+import { dbAll } from "../../lib/db";
 import { json } from "../../lib/response";
 import { getPrincipal, requireRole } from "../../lib/auth";
 
@@ -14,38 +14,33 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const q = String(url.searchParams.get("q") || "").trim();
   const ownerId = String(url.searchParams.get("ownerId") || "").trim();
 
-  const limit = Math.max(1, Math.min(200, Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 50));
-  const offset = Math.max(0, Number.isFinite(offsetRaw) ? Math.floor(offsetRaw) : 0);
+  const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 50, 1), 200);
+  const offset = Math.max(Number.isFinite(offsetRaw) ? Math.floor(offsetRaw) : 0, 0);
 
-  let where = "WHERE 1=1";
-  const params: any[] = [];
+  const where: string[] = [];
+  const args: any[] = [];
 
   if (ownerId) {
-    where += " AND n.owner_id = ?";
-    params.push(ownerId);
+    where.push("n.owner_id = ?");
+    args.push(ownerId);
   }
-
   if (q) {
-    where += " AND (n.title LIKE ? OR n.body LIKE ? OR u.username LIKE ? OR n.owner_id LIKE ?)";
+    where.push("(n.title LIKE ? OR n.body LIKE ? OR u.username LIKE ? OR n.owner_id LIKE ?)");
     const like = `%${q}%`;
-    params.push(like, like, like, like);
+    args.push(like, like, like, like);
   }
 
-  const totalRow = await dbOne<any>(
-    ctx.env.DB,
-    `
-    SELECT COUNT(*) as c
+  const whereSql = where.length ? ("WHERE " + where.join(" AND ")) : "";
+
+  const totalRows = await dbAll<any>(ctx.env.DB, `
+    SELECT COUNT(*) as cnt
     FROM notes n
     LEFT JOIN users u ON u.id = n.owner_id AND n.owner_type = 'user'
-    ${where}
-    `,
-    params
-  );
-  const total = Number(totalRow?.c || 0);
+    ${whereSql}
+  `, args);
+  const total = Number(totalRows?.[0]?.cnt || 0);
 
-  const rows = await dbAll<any>(
-    ctx.env.DB,
-    `
+  const rows = await dbAll<any>(ctx.env.DB, `
     SELECT
       n.id, n.owner_type as ownerType, n.owner_id as ownerId,
       n.title, n.body, n.tags, n.done, n.pinned,
@@ -53,16 +48,14 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
       u.username as ownerUsername
     FROM notes n
     LEFT JOIN users u ON u.id = n.owner_id AND n.owner_type = 'user'
-    ${where}
+    ${whereSql}
     ORDER BY n.updated_at DESC
     LIMIT ? OFFSET ?
-    `,
-    [...params, limit, offset]
-  );
+  `, [...args, limit, offset]);
 
   return json({
     items: rows,
-    notes: rows, // 兼容旧前端
+    notes: rows,
     page: {
       limit,
       offset,
@@ -71,4 +64,3 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     },
   });
 };
-

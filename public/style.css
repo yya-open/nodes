@@ -378,24 +378,21 @@ body{
 .shareHint{ color:rgba(255,255,255,.7); font-size:12px; }
 
 /* ========== Admin 弹窗：内部列表可滚动（用户/备忘录） ========== */
-/* 目标：Header/Tab/筛选固定，中间列表区域滚动 */
 #adminModal{
   max-height: 90vh;
   height: 90vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* 外层不滚，滚动交给内部 */
+  overflow: hidden;
 }
 
-/* modalBody 必须能撑满剩余高度，且允许子元素出现滚动 */
 #adminModal .modalBody{
   flex: 1 1 auto;
-  min-height: 0;    /* 关键：flex 子元素允许变小，从而触发滚动 */
-  overflow: hidden; /* 防止 modalBody 自己滚，让列表滚 */
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* 让 tab 区域固定在顶部（tabbar + 搜索/筛选/刷新行） */
-#adminModal .tabbar{
+#adminModal .tabs{
   position: sticky;
   top: 0;
   z-index: 5;
@@ -405,7 +402,6 @@ body{
   border-bottom: 1px solid rgba(255,255,255,.08);
 }
 
-/* tab 面板使用列布局：上面工具条，下面列表滚动 */
 #adminPanelUsers,
 #adminPanelNotes{
   flex: 1 1 auto;
@@ -415,7 +411,6 @@ body{
   gap: 12px;
 }
 
-/* 列表容器滚动（用户列表/备忘录列表） */
 #usersList,
 #adminNotesList{
   flex: 1 1 auto;
@@ -423,10 +418,9 @@ body{
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-right: 6px; /* 给滚动条留空间 */
+  padding-right: 6px;
 }
 
-/* （可选）更好看的滚动条 */
 #usersList::-webkit-scrollbar,
 #adminNotesList::-webkit-scrollbar{ width: 10px; }
 #usersList::-webkit-scrollbar-thumb,
