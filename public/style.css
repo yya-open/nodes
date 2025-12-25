@@ -376,3 +376,22 @@ body{
 .shareActions{ display:flex; gap:10px; align-items:center; }
 .shareLabel{ display:flex; gap:10px; align-items:center; color:rgba(255,255,255,.88); }
 .shareHint{ color:rgba(255,255,255,.7); font-size:12px; }
+
+/* 让管理员弹窗内部可滚动 */
+#adminModal{
+  max-height: 90vh;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;     /* 关键：外层不滚，交给内部滚动 */
+}
+
+/* 两个 tab 面板负责滚动（你代码里就是这俩） */
+#adminPanelUsers,
+#adminPanelNotes{
+  flex: 1 1 auto;
+  min-height: 0;        /* 关键：让 flex 子元素允许变小，从而出现滚动条 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
