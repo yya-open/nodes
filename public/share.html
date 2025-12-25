@@ -2,81 +2,44 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>分享的备忘录</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body{padding:24px;}
+    .card{max-width:900px;margin:0 auto;}
+    pre{white-space:pre-wrap;word-break:break-word;}
+  </style>
 </head>
 <body>
-  <div class="wrap" style="max-width:860px;">
-    <header class="top" style="justify-content:space-between;">
-      <div class="brand">
-        <div class="logo">📝</div>
-        <div>
-          <div class="name">分享的备忘录</div>
-          <div class="sub">只读查看</div>
-        </div>
-      </div>
-      <a class="btn" href="/" style="text-decoration:none; display:inline-flex; align-items:center;">返回主页</a>
-    </header>
-
-    <div class="card" style="padding:18px;">
-      <div id="sTitle" style="font-size:20px; font-weight:700;"></div>
-      <div id="sMeta" class="smallmuted" style="margin-top:6px;"></div>
-      <div id="sTags" class="tags" style="margin-top:10px;"></div>
-      <div id="sBody" style="white-space:pre-wrap; margin-top:14px; line-height:1.6;"></div>
-      <div id="sMsg" class="smallmuted" style="margin-top:14px;"></div>
-    </div>
+  <div class="card">
+    <h1 style="margin-top:0">分享的备忘录</h1>
+    <div id="meta" class="hint"></div>
+    <h3 id="title"></h3>
+    <pre id="content"></pre>
+    <div id="msg" class="hint"></div>
   </div>
 
-  <script>
-    async function api(path){
-      const res = await fetch(path, { headers: { "accept": "application/json" }});
-      const data = (res.headers.get("content-type")||"").includes("application/json") ? await res.json() : await res.text();
-      if(!res.ok){
-        const msg = data && data.error ? data.error : (typeof data==="string" ? data : "请求失败");
-        throw new Error(msg);
-      }
-      return data;
-    }
+<script>
+(async () => {
+  const qs = new URLSearchParams(location.search);
+  const token = qs.get("token");
+  const msg = document.getElementById("msg");
+  if (!token) { msg.textContent = "缺少 token。"; return; }
 
-    function esc(s){ return String(s||""); }
-    function fmt(t){
-      if(!t) return "";
-      try { return new Date(t).toLocaleString(); } catch { return String(t); }
-    }
-
-    (async () => {
-      const code = (location.hash || "").replace(/^#/, "").trim();
-      const elTitle = document.getElementById("sTitle");
-      const elMeta = document.getElementById("sMeta");
-      const elTags = document.getElementById("sTags");
-      const elBody = document.getElementById("sBody");
-      const elMsg = document.getElementById("sMsg");
-
-      if(!code){
-        elMsg.textContent = "缺少分享码。";
-        return;
-      }
-
-      elMsg.textContent = "加载中...";
-      try{
-        const r = await api("/api/share/" + encodeURIComponent(code));
-        const n = r.note;
-        elTitle.textContent = esc(n.title) || "（无标题）";
-        elBody.textContent = esc(n.body);
-        elMeta.textContent = "更新：" + fmt(n.updatedAt) + (r.meta && r.meta.burned ? " · 阅后即焚链接（已失效）" : "");
-        elTags.innerHTML = "";
-        (n.tags || []).forEach(tag => {
-          const span = document.createElement("span");
-          span.className = "tag";
-          span.textContent = tag;
-          elTags.appendChild(span);
-        });
-        elMsg.textContent = r.meta && r.meta.burned ? "此链接已自动失效（阅后即焚）。" : "";
-      }catch(e){
-        elMsg.textContent = "打开失败：" + (e.message || e);
-      }
-    })();
-  </script>
+  try {
+    const res = await fetch("/api/share/open?token=" + encodeURIComponent(token), { credentials: "include" });
+    const ct = res.headers.get("content-type") || "";
+    const data = ct.includes("application/json") ? await res.json() : { error: await res.text() };
+    if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+    document.getElementById("title").textContent = data.title || "(无标题)";
+    document.getElementById("content").textContent = data.content || "";
+    document.getElementById("meta").textContent = data.burnAfterRead ? "阅后即焚链接：打开一次后失效" : "普通分享链接";
+    msg.textContent = "已加载。";
+  } catch (e) {
+    msg.textContent = "加载失败：" + (e.message || e);
+  }
+})();
+</script>
 </body>
 </html>

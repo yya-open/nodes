@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>备忘录系统（云同步版）</title>
+  <title>备忘录系统</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -11,8 +11,8 @@
     <div class="brand">
       <div class="logo">📝</div>
       <div>
-        <div class="title">备忘录系统（云同步）</div>
-        <div class="subtitle">Cloudflare Pages + D1 · 游客/用户/管理员</div>
+        <div class="title">备忘录系统</div>
+        <div class="subtitle">Cloudflare Pages </div>
       </div>
     </div>
 
@@ -46,6 +46,7 @@
           <option value="created_asc">按创建时间（旧→新）</option>
         </select>
 
+        <button id="btnGuestTools" class="btn hidden">游客工具</button>
         <button id="btnAdmin" class="btn hidden">用户管理</button>
       </div>
 
@@ -97,11 +98,47 @@
 
     <div class="modalFooter">
       <button id="btnDelete" class="btn danger hidden">删除</button>
+      <button id="btnShare" class="btn">分享</button>
       <div class="spacer"></div>
       <button id="btnCancel" class="btn">取消</button>
       <button id="btnSave" class="btn primary">保存</button>
     </div>
   </div>
+
+  
+  <!-- Share Modal -->
+  <div id="shareMask" class="mask hidden"></div>
+  <div id="shareModal" class="modal hidden shareModal" role="dialog" aria-modal="true" aria-label="分享">
+    <div class="modalHeader">
+      <div class="modalTitle">分享</div>
+      <button id="btnShareClose" class="iconBtn" title="关闭">×</button>
+    </div>
+    <div class="modalBody">
+      <div class="shareRow">
+        <label class="shareLabel">
+          <input id="shareBurn" type="checkbox" />
+          <span>阅后即焚（首次打开后失效）</span>
+        </label>
+      </div>
+      <div class="shareRow">
+        <label class="shareLabel">
+          <span class="shareHint">有效期（小时，0/留空=不过期）</span>
+        </label>
+        <input id="shareExpireHours" class="input" placeholder="例如：24" />
+      </div>
+
+      <div class="shareRow shareActions">
+        <button id="btnShareCreate" class="btn primary">生成链接</button>
+        <button id="btnShareCopy" class="btn">复制</button>
+      </div>
+
+      <div class="shareRow">
+        <input id="shareLink" class="input" readonly placeholder="生成后链接会出现在这里" />
+      </div>
+      <div id="shareMsg" class="hint"></div>
+    </div>
+  </div>
+
 
   <!-- Login Modal -->
   <div id="loginMask" class="mask hidden"></div>
@@ -134,7 +171,7 @@
         <div class="smallmuted">管理员可在「用户管理」中创建/重置用户口令。</div>
       </div>
 
-      <div id="loginMsg" class="smallmuted"></div>
+      <div id="loginMsg" class="statusMsg"></div>
     </div>
 
     <div class="modalFooter">
@@ -151,7 +188,14 @@
       <div class="modalTitle">用户管理（管理员）</div>
       <button id="btnAdminClose" class="iconBtn" aria-label="关闭">✕</button>
     </div>
+    <div class="tabs">
+    <button id="adminTabUsers" class="tabbtn active" type="button">用户</button>
+    <button id="adminTabNotes" class="tabbtn" type="button">备忘录</button>
+    </div>
+
     <div class="modalBody">
+      <div id="adminPanelUsers">
+
       <div class="row">
         <input id="newUsername" class="input" placeholder="新用户名（唯一）" />
         <input id="newPasscode" class="input" placeholder="口令（至少6位）" />
@@ -166,8 +210,23 @@
 
       <div id="usersList" class="users"></div>
       <div id="usersEmpty" class="smallmuted hidden">暂无用户。</div>
-      <div id="adminMsg" class="smallmuted"></div>
-    </div>
+      <div id="adminMsg" class="statusMsg"></div>
+    
+      </div>
+
+
+      <div id="adminPanelNotes" class="hidden">
+        <div class="row">
+          <input id="adminNotesSearch" class="input" placeholder="搜索标题/内容/创建者…" />
+          <select id="adminNotesOwner" class="select"><option value="">所有创建者</option></select>
+          <button id="btnAdminNotesRefresh" class="btn">刷新</button>
+        </div>
+        <div id="adminNotesList" class="list"></div>
+        <div id="adminNotesEmpty" class="smallmuted hidden">暂无备忘录。</div>
+        <div id="adminNotesMsg" class="statusMsg"></div>
+      </div>
+
+</div>
     <div class="modalFooter">
       <div class="smallmuted">提示：重置口令会立即生效（旧 token 仍可能在过期前有效）。</div>
       <div class="spacer"></div>
@@ -175,43 +234,76 @@
     </div>
   </div>
 
-  <script src="./app.js"></script>
-</body>
-</html>
-  <!-- Share Modal -->
-  <div class="modalMask hidden" id="shareMask">
-    <div class="modal hidden" id="shareModal" role="dialog" aria-modal="true" aria-label="分享">
-      <div class="modalHeader">
-        <div class="modalTitle">分享备忘录</div>
-        <button class="iconBtn" id="btnShareClose" title="关闭">×</button>
-      </div>
 
-      <div class="modalBody">
-        <div class="row gap">
-          <div class="field">
-            <label>有效期（分钟）</label>
-            <input class="input" id="shareExpires" type="number" min="1" value="1440" />
-          </div>
-          <div class="field">
-            <label>&nbsp;</label>
-            <label class="checkboxLine"><input type="checkbox" id="shareBurn" /> 阅后即焚（首次打开后失效）</label>
-          </div>
+  <!-- Guest Tools Modal -->
+  <div id="guestToolsMask" class="mask hidden"></div>
+  <div id="guestToolsModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalHeader">
+      <div class="modalTitle">游客工具</div>
+      <button id="btnGuestToolsClose" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+    <div class="modalBody">
+      <div class="hint">
+        <div class="hintTitle">生成恢复码</div>
+        <div class="hintText">用于在新设备恢复当前游客数据（短时有效）。</div>
+        <div class="row">
+          <button id="btnGenRecover" class="btn">生成恢复码</button>
+          <input id="recoverCodeOut" class="input" placeholder="生成后显示在这里" readonly />
+          <button id="btnCopyRecover" class="btn">复制</button>
         </div>
+      </div>
 
-        <div class="row gap">
-          <button class="btn primary" id="btnShareCreate">生成链接</button>
-          <input class="input" id="shareUrl" placeholder="生成后显示在这里" readonly />
-          <button class="btn" id="btnShareCopy">复制</button>
+      <div class="divider"></div>
+
+      <div class="hint">
+        <div class="hintTitle">在新设备使用恢复码</div>
+        <div class="hintText">先以游客身份进入，再输入恢复码即可切换到原游客。</div>
+        <div class="row">
+          <input id="recoverCodeIn" class="input" placeholder="输入恢复码，例如 G-xxxx" />
+          <button id="btnUseRecover" class="btn primary">使用恢复码</button>
         </div>
-
-        <div class="hint" id="shareMsg"></div>
       </div>
 
-      <div class="modalFooter">
-        <div class="spacer"></div>
-        <button class="btn" id="btnShareOk">完成</button>
+      <div class="divider"></div>
+
+      <div class="hint">
+        <div class="hintTitle">游客转正</div>
+        <div class="hintText">创建账号并迁移当前游客的所有备忘录到该账号。</div>
+        <div class="row">
+          <input id="upgradeUsername" class="input" placeholder="新用户名（唯一）" />
+          <input id="upgradePasscode" class="input" type="password" placeholder="新口令（至少6位）" />
+          <button id="btnGuestUpgrade" class="btn primary">转为账号</button>
+        </div>
       </div>
+
+      <div id="guestToolsMsg" class="statusMsg"></div>
+    </div>
+    <div class="modalFooter">
+      <div class="smallmuted">提示：恢复码仅用于恢复“游客身份”，不会公开你的数据。</div>
+      <div class="spacer"></div>
+      <button id="btnGuestToolsCancel" class="btn">关闭</button>
     </div>
   </div>
 
 
+  <!-- Admin Note View Modal -->
+  <div id="adminNoteViewMask" class="mask hidden"></div>
+  <div id="adminNoteViewModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalHeader">
+      <div class="modalTitle" id="adminNoteViewTitle">备忘录</div>
+      <button id="btnAdminNoteViewX" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+    <div class="modalBody">
+      <div id="adminNoteViewMeta" class="smallmuted"></div>
+      <pre id="adminNoteViewBody" class="pre"></pre>
+    </div>
+    <div class="modalFooter">
+      <div class="spacer"></div>
+      <button id="btnAdminNoteViewClose" class="btn">关闭</button>
+    </div>
+  </div>
+
+
+  <script src="./app.js"></script>
+</body>
+</html>
