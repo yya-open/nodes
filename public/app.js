@@ -531,13 +531,38 @@
 
   // ---- Admin UI
   function openAdmin() {
-    adminMsg.textContent = "";
-    adminMask.classList.remove("hidden");
-    adminModal.classList.remove("hidden");
-    adminNotesLoaded = false;
-    setAdminTab("users");
-    refreshUsers();
+  adminMsg.textContent = "";
+  adminMask.classList.remove("hidden");
+  adminModal.classList.remove("hidden");
+  // ✅ 每次打开都保证 Tab 事件绑定成功
+  bindAdminTabs();
+  // ✅ 默认进入用户 Tab（或者你想默认 notes 也行）
+  setAdminTab("users");
+}
+  function bindAdminTabs() {
+  const tabUsers = document.getElementById("adminTabUsers");
+  const tabNotes = document.getElementById("adminTabNotes");
+
+  // 元素还没渲染出来就直接返回（下次 openAdmin 再绑）
+  if (!tabUsers || !tabNotes) return;
+
+  // 防止重复绑定
+  if (!tabUsers.dataset.bound) {
+    tabUsers.dataset.bound = "1";
+    tabUsers.addEventListener("click", (e) => {
+      e.preventDefault();
+      setAdminTab("users");
+    });
   }
+
+  if (!tabNotes.dataset.bound) {
+    tabNotes.dataset.bound = "1";
+    tabNotes.addEventListener("click", (e) => {
+      e.preventDefault();
+      setAdminTab("notes");
+    });
+  }
+}
   function closeAdmin() {
     adminMask.classList.add("hidden");
     adminModal.classList.add("hidden");
