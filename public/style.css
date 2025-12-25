@@ -289,39 +289,48 @@ body{
   border:1px solid var(--line);
   color: var(--muted);
 }
-/* Admin tabs */
-.tabbar{
+
+.checkboxLine{
   display:flex;
-  gap:10px;
   align-items:center;
-  margin: 6px 0 12px;
+  gap:10px;
+  user-select:none;
+  opacity:.95;
 }
 
-.tabbtn{
-  appearance:none;
-  border:1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.82);
-  padding: 8px 14px;
-  border-radius: 12px;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: transform .06s ease, background .15s ease, border-color .15s ease;
+.adminNoteItem{
+  border:1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+  border-radius:14px;
+  padding:12px 14px;
+  margin:10px 0;
 }
-
-.tabbtn:hover{
-  background: rgba(255,255,255,.10);
-  border-color: rgba(255,255,255,.22);
+.adminNoteTitle{
+  font-weight:700;
+  font-size:15px;
+  margin-bottom:6px;
 }
-
-.tabbtn:active{
-  transform: translateY(1px);
+.adminNoteMeta{
+  font-size:12px;
+  opacity:.78;
+  margin-bottom:8px;
 }
-
-.tabbtn.active{
-  background: rgba(59,130,246,.22);
-  border-color: rgba(59,130,246,.55);
-  color: rgba(255,255,255,.95);
-  box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+.adminNotePreview{
+  font-size:13px;
+  opacity:.92;
+  white-space:pre-wrap;
 }
+.adminNoteFull{
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px dashed rgba(255,255,255,.12);
+  white-space:pre-wrap;
+  font-size:13px;
+  opacity:.95;
+}
+.adminNoteActions{
+  margin-top:10px;
+  display:flex;
+  justify-content:flex-end;
+}
+.btn.sm{ padding:8px 10px; font-size:12px; border-radius:12px;}
