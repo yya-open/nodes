@@ -185,7 +185,7 @@
       await api("/api/auth/guest/recover", { method: "POST", body: JSON.stringify({ code }) });
       guestToolsMsg.textContent = "恢复成功，正在刷新…";
       await refreshMe();
-      await loadMemos();
+      await loadNotes();
       closeGuestTools();
     } catch (e) {
       guestToolsMsg.textContent = "恢复失败：" + (e.message || e);
@@ -201,7 +201,7 @@
     try {
       await api("/api/auth/guest/upgrade", { method: "POST", body: JSON.stringify({ username, passcode }) });
       await refreshMe();
-      await loadMemos();
+      await loadNotes();
       closeGuestTools();
     } catch (e) {
       guestToolsMsg.textContent = "转正失败：" + (e.message || e);
@@ -734,13 +734,6 @@
   $("btnAdminCancel").addEventListener("click", closeAdmin);
   adminMask.addEventListener("click", closeAdmin);
   $("btnCreateUser").addEventListener("click", createUser);
-
-  // Admin tabs / notes events
-  adminTabUsers.addEventListener("click", () => setAdminTab("users"));
-  adminTabNotes.addEventListener("click", () => setAdminTab("notes"));
-  btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
-  adminNotesSearch.addEventListener("input", () => renderAdminNotes());
-
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
