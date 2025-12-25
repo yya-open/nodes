@@ -148,6 +148,11 @@
   function closeLogin() {
     loginMask.classList.add("hidden");
     loginModal.classList.add("hidden");
+
+
+    // ✅ 关闭时也清空输入框
+    loginUser.value = "";
+    loginPass.value = "";
   }
 
 
@@ -215,6 +220,9 @@
       await refreshMe();
       await loadNotes();
       closeLogin();
+      // ✅ 成功后清空输入框
+      loginUser.value = "";
+      loginPass.value = "";
     } catch (e) {
       loginMsg.textContent = `进入失败：${e.message || e}`;
     }
@@ -233,6 +241,9 @@
       await refreshMe();
       await loadNotes();
       closeLogin();
+      // ✅ 成功后清空输入框
+      loginUser.value = "";
+      loginPass.value = "";
     } catch (e) {
       loginMsg.textContent = `登录失败：${e.message || e}`;
     }
