@@ -6,47 +6,346 @@
   <title>分享的备忘录</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    body{padding:24px;}
-    .card{max-width:900px;margin:0 auto;}
-    pre{white-space:pre-wrap;word-break:break-word;}
+    /* Share page polish */
+    .shareWrap{ max-width: 980px; margin: 18px auto; padding: 0 14px; }
+    .hero{
+      margin-top: 10px;
+      padding: 18px 18px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      box-shadow: var(--shadow);
+    }
+    .heroTop{
+      display:flex; align-items:flex-start; justify-content:space-between; gap: 12px;
+      flex-wrap: wrap;
+    }
+    .heroTitle{
+      font-size: 28px; font-weight: 800; letter-spacing: .3px; margin: 0;
+      line-height: 1.15;
+    }
+    .heroSub{
+      margin-top: 8px;
+      display:flex; gap: 8px; flex-wrap: wrap; align-items:center;
+      color: var(--muted); font-size: 13px;
+    }
+    .badges{ display:flex; gap: 8px; flex-wrap: wrap; align-items:center; }
+    .badgeStrong{
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      color: rgba(231,236,255,.9);
+    }
+    .badgeStrong.ok{
+      background: rgba(91,124,250,.16);
+      border-color: rgba(91,124,250,.30);
+    }
+    .badgeStrong.warn{
+      background: rgba(255,92,122,.14);
+      border-color: rgba(255,92,122,.32);
+    }
+    .badgeStrong.muted{ color: var(--muted); }
+    .heroActions{ display:flex; gap: 10px; flex-wrap: wrap; }
+    .noteCard{
+      margin-top: 14px;
+      border-radius: 20px;
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.72);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+    .noteHead{
+      display:flex; align-items:flex-start; justify-content:space-between; gap: 12px;
+      flex-wrap: wrap;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed rgba(255,255,255,.10);
+      margin-bottom: 12px;
+    }
+    .noteTitle{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 750;
+      line-height: 1.25;
+    }
+    .noteMeta{
+      margin-top: 6px;
+      display:flex; flex-wrap: wrap; gap: 8px; align-items:center;
+      color: var(--muted); font-size: 12px;
+    }
+    .noteBody{
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.65;
+      font-size: 14px;
+      color: rgba(231,236,255,.92);
+    }
+    .callout{
+      margin-top: 12px;
+      border-radius: 16px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.05);
+      padding: 10px 12px;
+      color: rgba(231,236,255,.88);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .callout.warn{
+      background: rgba(255,92,122,.10);
+      border-color: rgba(255,92,122,.28);
+    }
+    .grid2{
+      display:grid;
+      grid-template-columns: 1.4fr .6fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .sideCard{
+      border-radius: 20px;
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.62);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+    .sideTitle{ margin: 0 0 10px; font-size: 14px; color: rgba(231,236,255,.9); font-weight: 700; }
+    .kv{ display:flex; justify-content:space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 12px; color: var(--muted); }
+    .kv:last-child{ border-bottom: none; }
+    .kv b{ color: rgba(231,236,255,.88); font-weight: 650; }
+    .footerHint{
+      margin: 14px 2px 24px;
+      color: rgba(231,236,255,.45);
+      font-size: 12px;
+      text-align:center;
+    }
+    .skeleton{
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.08), rgba(255,255,255,.05));
+      background-size: 200% 100%;
+      animation: sk 1.2s ease-in-out infinite;
+    }
+    @keyframes sk { 0%{ background-position: 200% 0 } 100%{ background-position: -200% 0 } }
+    .skLine{ height: 14px; margin: 10px 0; }
+    .skLine.sm{ height: 10px; width: 60%; }
+    .skBlock{ height: 120px; margin-top: 12px; }
+    @media (max-width: 860px){
+      .grid2{ grid-template-columns: 1fr; }
+      .heroTitle{ font-size: 24px; }
+    }
   </style>
 </head>
+
 <body>
-  <div class="card">
-    <h1 style="margin-top:0">分享的备忘录</h1>
-    <div id="meta" class="hint"></div>
-    <h3 id="title"></h3>
-    <pre id="content"></pre>
-    <div id="msg" class="hint"></div>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">🗒️</div>
+      <div>
+        <div class="title">分享的备忘录</div>
+        <div class="subtitle" id="subtitle">正在加载…</div>
+      </div>
+    </div>
+    <div class="actions">
+      <span class="who" id="statusPill">加载中</span>
+    </div>
+  </div>
+
+  <div class="shareWrap">
+    <div class="hero" id="hero">
+      <div class="heroTop">
+        <div>
+          <h1 class="heroTitle" id="pageTitle">分享的备忘录</h1>
+          <div class="heroSub">
+            <span class="badgeStrong muted" id="linkType">—</span>
+            <span class="badgeStrong muted" id="expBadge">—</span>
+            <span class="badgeStrong muted" id="readsBadge">—</span>
+          </div>
+        </div>
+
+        <div class="heroActions">
+          <button class="btn primary" id="btnCopy">复制内容</button>
+          <button class="btn" id="btnCopyAll">复制标题+内容</button>
+          <button class="btn" id="btnDownload">下载 TXT</button>
+        </div>
+      </div>
+
+      <div class="callout warn hidden" id="burnCallout">
+        ⚠️ 这是「阅后即焚」分享链接：本次打开后链接将失效（再次访问可能显示已失效/已过期）。
+      </div>
+      <div class="callout hidden" id="expCallout"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="noteCard" id="noteCard">
+        <div class="noteHead">
+          <div>
+            <h2 class="noteTitle" id="noteTitle">（加载中）</h2>
+            <div class="noteMeta" id="noteMeta">
+              <span class="badge">—</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="noteBody" id="noteBody"></p>
+
+        <div class="callout hidden" id="errorBox"></div>
+
+        <div class="skeleton" id="skeleton" style="padding:14px;">
+          <div class="skeleton skLine"></div>
+          <div class="skeleton skLine sm"></div>
+          <div class="skeleton skBlock"></div>
+        </div>
+      </div>
+
+      <div class="sideCard">
+        <p class="sideTitle">信息</p>
+        <div class="kv"><span>分享码</span><b id="kvCode">—</b></div>
+        <div class="kv"><span>打开时间</span><b id="kvServedAt">—</b></div>
+        <div class="kv"><span>过期时间</span><b id="kvExpiresAt">—</b></div>
+        <div class="kv"><span>打开次数</span><b id="kvReads">—</b></div>
+      </div>
+    </div>
+
+    <div class="footerHint">提示：分享页仅展示内容，不包含你的账号信息。</div>
   </div>
 
 <script>
-(async () => {
-  const qs = new URLSearchParams(location.search);
-  const token = qs.get("token");
-  const hashCode = (location.hash || "").replace(/^#/, "");
-  const code = token || hashCode;
+  const $ = (id) => document.getElementById(id);
 
-  const msg = document.getElementById("msg");
-  if (!code) { msg.textContent = "缺少 token/code。"; return; }
-
-  try {
-    const res = await fetch("/api/share/" + encodeURIComponent(code), { credentials: "include" });
-    const ct = res.headers.get("content-type") || "";
-    const data = ct.includes("application/json") ? await res.json() : { error: await res.text() };
-    if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
-
-    // 适配后端返回：{ note: {title, body...}, meta: {burned...} }
-    document.getElementById("title").textContent = data.note?.title || "(无标题)";
-    document.getElementById("content").textContent = data.note?.body || "";
-
-    const burned = !!data.meta?.burned;
-    document.getElementById("meta").textContent = burned ? "阅后即焚链接：打开一次后失效" : "普通分享链接";
-    msg.textContent = "已加载。";
-  } catch (e) {
-    msg.textContent = "加载失败：" + (e.message || e);
+  function fmt(dt) {
+    if (!dt) return "—";
+    const t = Date.parse(String(dt));
+    if (Number.isNaN(t)) return String(dt);
+    const d = new Date(t);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
-})();
+
+  function relExpire(expiresAt) {
+    if (!expiresAt) return { text: "不过期", warn: false };
+    const t = Date.parse(String(expiresAt));
+    if (Number.isNaN(t)) return { text: fmt(expiresAt), warn: false };
+    const diff = t - Date.now();
+    if (diff <= 0) return { text: "已过期", warn: true };
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return { text: `${mins} 分钟后过期`, warn: true };
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return { text: `${hours} 小时后过期`, warn: hours <= 6 };
+    const days = Math.floor(hours / 24);
+    return { text: `${days} 天后过期`, warn: days <= 1 };
+  }
+
+  function getCode() {
+    const qs = new URLSearchParams(location.search);
+    const token = qs.get("token");
+    const hashCode = (location.hash || "").replace(/^#/, "");
+    return token || hashCode || "";
+  }
+
+  async function copyText(text) {
+    await navigator.clipboard.writeText(text);
+    $("statusPill").textContent = "已复制";
+    setTimeout(() => $("statusPill").textContent = "已加载", 1200);
+  }
+
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  (async () => {
+    const code = getCode();
+    $("kvCode").textContent = code || "—";
+
+    if (!code) {
+      $("subtitle").textContent = "缺少 token/code";
+      $("statusPill").textContent = "错误";
+      $("errorBox").classList.remove("hidden");
+      $("errorBox").classList.add("warn");
+      $("errorBox").textContent = "链接不完整：请使用分享链接打开（hash 或 ?token=）。";
+      $("skeleton").classList.add("hidden");
+      return;
+    }
+
+    try {
+      $("subtitle").textContent = "正在获取内容…";
+      $("statusPill").textContent = "加载中";
+
+      const res = await fetch("/api/share/" + encodeURIComponent(code), { credentials: "include" });
+      const ct = res.headers.get("content-type") || "";
+      const data = ct.includes("application/json") ? await res.json() : { error: await res.text() };
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+
+      const note = data.note || {};
+      const meta = data.meta || {};
+
+      document.title = (note.title ? note.title + " · " : "") + "分享的备忘录";
+      $("pageTitle").textContent = "分享的备忘录";
+      $("subtitle").textContent = "已加载";
+      $("statusPill").textContent = "已加载";
+
+      // Badges
+      const burned = !!meta.burned;
+      $("linkType").textContent = burned ? "阅后即焚链接" : "普通分享链接";
+      $("linkType").className = "badgeStrong " + (burned ? "warn" : "ok");
+
+      const exp = relExpire(meta.expiresAt);
+      $("expBadge").textContent = exp.text;
+      $("expBadge").className = "badgeStrong " + (exp.warn ? "warn" : "muted");
+
+      $("readsBadge").textContent = `已打开 ${Number(meta.reads || 0)} 次`;
+      $("readsBadge").className = "badgeStrong muted";
+
+      // Callouts
+      if (burned) $("burnCallout").classList.remove("hidden");
+      if (meta.expiresAt) {
+        $("expCallout").classList.remove("hidden");
+        $("expCallout").textContent = `⏳ 过期时间：${fmt(meta.expiresAt)}（${exp.text}）`;
+      }
+
+      // Note content
+      $("noteTitle").textContent = note.title || "（无标题）";
+      const tags = Array.isArray(note.tags) ? note.tags : [];
+      const tagHtml = tags.length
+        ? `<span class="badge">标签</span><span class="tags">${tags.map(t => `<span class="tag">${String(t)}</span>`).join("")}</span>`
+        : `<span class="badge">无标签</span>`;
+      $("noteMeta").innerHTML = `
+        <span class="badge">创建：${fmt(note.createdAt)}</span>
+        <span class="badge">更新：${fmt(note.updatedAt)}</span>
+        ${tagHtml}
+      `;
+
+      $("noteBody").textContent = note.body || "";
+      $("skeleton").classList.add("hidden");
+
+      // Side info
+      $("kvServedAt").textContent = fmt(meta.servedAt);
+      $("kvExpiresAt").textContent = meta.expiresAt ? fmt(meta.expiresAt) : "不过期";
+      $("kvReads").textContent = String(meta.reads ?? "—");
+
+      // Actions
+      $("btnCopy").onclick = async () => copyText(note.body || "");
+      $("btnCopyAll").onclick = async () => copyText(`${note.title || ""}\n\n${note.body || ""}`.trim());
+      $("btnDownload").onclick = () => downloadText((note.title || "note") + ".txt", note.body || "");
+
+    } catch (e) {
+      $("subtitle").textContent = "加载失败";
+      $("statusPill").textContent = "失败";
+      $("skeleton").classList.add("hidden");
+      $("errorBox").classList.remove("hidden");
+      $("errorBox").classList.add("warn");
+      $("errorBox").textContent = "加载失败：" + (e.message || e);
+      $("linkType").textContent = "无法加载";
+      $("linkType").className = "badgeStrong warn";
+      $("expBadge").textContent = "—";
+      $("readsBadge").textContent = "—";
+    }
+  })();
 </script>
 </body>
 </html>
