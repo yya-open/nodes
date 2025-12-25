@@ -5,11 +5,12 @@
 - 普通用户（用户名 + 口令）
 - 管理员（用户管理：创建/删除/改角色/重置口令）
 - 备忘录：新增/编辑/删除、完成、置顶、标签、搜索、筛选、导入/导出
+- 备忘录分享：生成分享链接（支持“阅后即焚 / 过期时间”）
 
 ## 关键点
 - 纯前端：`public/`
 - 后端：Cloudflare Pages Functions：`functions/`
-- 数据库：Cloudflare D1（SQLite）：`migrations/0001_init.sql`
+- 数据库：Cloudflare D1（SQLite）：`migrations/*.sql`
 - 鉴权：HttpOnly Cookie + HMAC 签名 token（30 天有效）
 
 ## 1) 安装 & 登录
@@ -29,6 +30,20 @@ npx wrangler d1 create memo-cloud-db
 ## 3) 初始化表结构（迁移）
 ```bash
 npx wrangler d1 migrations apply memo-cloud-db --remote
+```
+
+> 说明：包含分享表（`note_shares`）以及用于定时任务节流的 `app_meta`（见 `0004_*`）。
+
+## 额外：定时清理过期分享
+
+### 自动（推荐）
+项目内置了一个 `functions/_middleware.ts`，会在有 API 流量时**后台**触发清理（默认每 6 小时最多跑一次），把已过期的分享标记为失效，并在保留期后删除。
+
+默认保留期：7 天（可在 `functions/lib/share_cleanup.ts` 调整）。
+
+### 手动触发（管理员）
+```
+GET /api/admin/shares/cleanup?force=1
 ```
 
 ## 4) 本地开发
