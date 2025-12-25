@@ -500,8 +500,32 @@ mTitleEl.value = x?.title || "";
     adminMsg.textContent = "";
     adminMask.classList.remove("hidden");
     adminModal.classList.remove("hidden");
+    bindAdminTabs();          // 如果你有这个函数
+    setAdminTab("users");     // 如果你有 tab 系统
     refreshUsers();
   }
+  function bindAdminTabs() {
+  const tabUsers = document.getElementById("adminTabUsers");
+  const tabNotes = document.getElementById("adminTabNotes");
+  // 元素还没渲染出来就直接返回（下次 openAdmin 再绑）
+  if (!tabUsers || !tabNotes) return;
+
+  // 防止重复绑定
+  if (!tabUsers.dataset.bound) {
+    tabUsers.dataset.bound = "1";
+    tabUsers.addEventListener("click", (e) => {
+      e.preventDefault();
+      setAdminTab("users");
+    });
+  }
+  if (!tabNotes.dataset.bound) {
+    tabNotes.dataset.bound = "1";
+    tabNotes.addEventListener("click", (e) => {
+      e.preventDefault();
+      setAdminTab("notes");
+    });
+  }
+}
   function closeAdmin() {
     adminMask.classList.add("hidden");
     adminModal.classList.add("hidden");
@@ -588,6 +612,146 @@ mTitleEl.value = x?.title || "";
     }
   }
 
+
+  function setAdminTab(which){
+  const tabUsers = document.getElementById("adminTabUsers");
+  const tabNotes = document.getElementById("adminTabNotes");
+  const panelUsers = document.getElementById("adminPanelUsers");
+  const panelNotes = document.getElementById("adminPanelNotes");
+
+  const isNotes = which === "notes";
+  tabUsers?.classList.toggle("active", !isNotes);
+  tabNotes?.classList.toggle("active", isNotes);
+
+  panelUsers?.classList.toggle("hidden", isNotes);
+  panelNotes?.classList.toggle("hidden", !isNotes);
+
+  // ✅ 关键：切到哪个 tab 就加载哪个
+  if (isNotes) refreshAdminNotes?.();
+  else refreshUsers();
+}
+
+
+  function ownerLabel(n) {
+    if (n && n.ownerUsername) return `${n.ownerUsername} · user`;
+    if (n && n.ownerType === "guest") return "游客 · guest";
+    return (n && n.ownerId) ? String(n.ownerId) : "unknown";
+  }
+
+  function rebuildAdminNotesOwners() {
+    if (!adminNotesOwner) return;
+    const prev = (adminNotesOwner.value || "").trim();
+    const map = new Map();
+    for (const n of (adminNotes || [])) {
+      const id = String(n.ownerId || "").trim();
+      if (!id) continue;
+      map.set(id, ownerLabel(n));
+    }
+    // clear + rebuild
+    adminNotesOwner.innerHTML = "";
+    const optAll = document.createElement("option");
+    optAll.value = "";
+    optAll.textContent = "所有创建者";
+    adminNotesOwner.appendChild(optAll);
+
+    const items = Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "zh"));
+    for (const [id, label] of items) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = label;
+      adminNotesOwner.appendChild(opt);
+    }
+    if (prev && map.has(prev)) adminNotesOwner.value = prev;
+    else adminNotesOwner.value = "";
+  }
+
+  function openAdminNoteView(n) {
+    if (!adminNoteViewModal) return;
+    adminNoteViewTitle.textContent = n.title || "(无标题)";
+    const meta = `创建者：${ownerLabel(n)} · 创建：${formatTime(n.createdAt || "")} · 更新：${formatTime(n.updatedAt || "")}`;
+    adminNoteViewMeta.textContent = meta;
+    adminNoteViewBody.textContent = n.body || "";
+    adminNoteViewMask.classList.remove("hidden");
+    adminNoteViewModal.classList.remove("hidden");
+  }
+
+  function closeAdminNoteView() {
+    if (!adminNoteViewModal) return;
+    adminNoteViewMask.classList.add("hidden");
+    adminNoteViewModal.classList.add("hidden");
+  }
+
+  function renderAdminNotes() {
+    const q = (adminNotesSearch.value || "").trim().toLowerCase();
+    const ownerSel = (adminNotesOwner && adminNotesOwner.value) ? adminNotesOwner.value.trim() : "";
+    const list = (adminNotes || []).filter((n) => {
+      if (ownerSel && String(n.ownerId || "") !== ownerSel) return false;
+      if (!q) return true;
+      const hay = `${n.title || ""} ${n.body || ""} ${n.ownerUsername || ""} ${n.ownerId || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+    adminNotesList.innerHTML = "";
+    adminNotesEmpty.classList.toggle("hidden", list.length !== 0);
+    if (list.length === 0) return;
+
+    for (const n of list) {
+      const row = document.createElement("div");
+      row.className = "userRow";
+
+      const main = document.createElement("div");
+      main.className = "adminNoteMain";
+
+      const title = document.createElement("div");
+      title.className = "adminNoteTitle";
+      title.textContent = n.title || "(无标题)";
+
+      const snippet = document.createElement("div");
+      snippet.className = "adminNoteSnippet";
+      snippet.textContent = (n.body || "").slice(0, 120);
+
+      const meta = document.createElement("div");
+      meta.className = "smallmuted";
+      meta.textContent = `创建者：${ownerLabel(n)} · 更新：${formatTime(n.updatedAt || "")}`;
+
+      main.appendChild(title);
+      main.appendChild(snippet);
+      main.appendChild(meta);
+
+      const spacer = document.createElement("div");
+      spacer.className = "spacer";
+
+      const btn = document.createElement("button");
+      btn.className = "btn small";
+      btn.type = "button";
+      btn.textContent = "查看全文";
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        openAdminNoteView(n);
+      });
+
+      row.appendChild(main);
+      row.appendChild(spacer);
+      row.appendChild(btn);
+      adminNotesList.appendChild(row);
+    }
+  }
+
+
+async function refreshAdminNotes() {
+    adminNotesMsg.textContent = "加载中…";
+    try {
+      const data = await api("/api/admin/notes", { method: "GET" });
+      adminNotes = data.notes || data || [];
+      adminNotesLoaded = true;
+      adminNotesMsg.textContent = "";
+      rebuildAdminNotesOwners();
+      renderAdminNotes();
+    } catch (e) {
+      adminNotesMsg.textContent = "加载失败：" + (e.message || e);
+    }
+  }
+
   async function createUser() {
     const u = (newUsername.value || "").trim();
     const p = (newPasscode.value || "").trim();
@@ -648,16 +812,42 @@ mTitleEl.value = x?.title || "";
 
   // admin modal events
   btnAdmin.addEventListener("click", openAdmin);
+  // Admin tabs: bind once to avoid occasional non-responsive clicks
+  adminTabUsers.addEventListener("click", () => setAdminTab("users"));
+  adminTabNotes.addEventListener("click", () => setAdminTab("notes"));
+  btnGuestTools.addEventListener("click", openGuestTools);
+  btnGuestToolsClose.addEventListener("click", closeGuestTools);
+  btnGuestToolsCancel.addEventListener("click", closeGuestTools);
+  guestToolsMask.addEventListener("click", closeGuestTools);
+  btnGenRecover.addEventListener("click", genRecoverCode);
+  btnCopyRecover.addEventListener("click", async () => {
+    try {
+      if (recoverCodeOut.value) await navigator.clipboard.writeText(recoverCodeOut.value);
+      setStatus(guestToolsMsg, recoverCodeOut.value ? "已复制" : "没有可复制的恢复码", recoverCodeOut.value ? "ok" : "warn");
+    } catch {
+      setStatus(guestToolsMsg, "复制失败，请手动复制。", "error");
+    }
+  });
+  btnUseRecover.addEventListener("click", useRecoverCode);
+  btnGuestUpgrade.addEventListener("click", guestUpgrade);
   $("btnAdminClose").addEventListener("click", closeAdmin);
   $("btnAdminCancel").addEventListener("click", closeAdmin);
   adminMask.addEventListener("click", closeAdmin);
   $("btnCreateUser").addEventListener("click", createUser);
+  // admin notes events
+  btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
+  adminNotesSearch.addEventListener("input", renderAdminNotes);
+  adminNotesOwner && adminNotesOwner.addEventListener("change", renderAdminNotes);
+  btnAdminNoteViewClose && btnAdminNoteViewClose.addEventListener("click", closeAdminNoteView);
+  btnAdminNoteViewX && btnAdminNoteViewX.addEventListener("click", closeAdminNoteView);
+  adminNoteViewMask && adminNoteViewMask.addEventListener("click", closeAdminNoteView);
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (!modalEl.classList.contains("hidden")) closeMemoModal();
       if (!loginModal.classList.contains("hidden")) closeLogin();
-      if (!adminModal.classList.contains("hidden")) closeAdmin();
+      if (!adminNoteViewModal.classList.contains("hidden")) closeAdminNoteView();
+       if (!adminModal.classList.contains("hidden")) closeAdmin();
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
@@ -668,6 +858,7 @@ mTitleEl.value = x?.title || "";
       openMemoModal(null);
     }
   });
+
 
   // ---- init
   (async () => {
