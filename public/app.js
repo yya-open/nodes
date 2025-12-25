@@ -560,19 +560,6 @@
   }
 
   // ---- Admin UI
-
-// Admin paging state
-let adminUsersLimit = 50;
-let adminUsersOffset = 0;
-let adminUsersTotal = null;
-let adminUsersHasMore = false;
-
-let adminNotesLimit = 50;
-let adminNotesOffset = 0;
-let adminNotesTotal = null;
-let adminNotesHasMore = false;
-let adminNotesDebounce = 0;
-
   function openAdmin() {
   adminMsg.textContent = "";
   adminMask.classList.remove("hidden");
@@ -582,7 +569,7 @@ let adminNotesDebounce = 0;
   // ✅ 默认进入用户 Tab（或者你想默认 notes 也行）
   setAdminTab("users");
   // ✅ 关键：立刻拉取用户列表
-  refreshUsers(true);
+  refreshUsers();
 }
   function bindAdminTabs() {
   const tabUsers = document.getElementById("adminTabUsers");
@@ -613,128 +600,86 @@ let adminNotesDebounce = 0;
     adminModal.classList.add("hidden");
   }
 
-  async function refreshUsers(reset = true) {
-  try {
-    if (reset) {
-      adminUsersOffset = 0;
-      adminUsersTotal = null;
-      adminUsersHasMore = false;
+  async function refreshUsers() {
+    try {
+      const data = await api("/api/admin/users", { method: "GET" });
+      const users = data.items || [];
       usersList.innerHTML = "";
-      if (usersMoreMsg) usersMoreMsg.textContent = "";
-      if (btnUsersMore) {
-        btnUsersMore.classList.add("hidden");
-        btnUsersMore.disabled = true;
-        btnUsersMore.textContent = "加载更多";
+      usersEmpty.classList.toggle("hidden", users.length !== 0);
+
+      for (const u of users) {
+        const row = document.createElement("div");
+        row.className = "userRow";
+
+        const name = document.createElement("div");
+        name.className = "u";
+        name.textContent = u.username;
+
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        pill.textContent = u.role;
+
+        const created = document.createElement("div");
+        created.className = "smallmuted";
+        created.textContent = `创建：${formatTime(u.createdAt)}  更新：${formatTime(u.updatedAt)}`;
+
+        const roleSel = document.createElement("select");
+        roleSel.className = "select";
+        roleSel.innerHTML = `<option value="user">普通用户</option><option value="admin">管理员</option>`;
+        roleSel.value = u.role;
+
+        const passInput = document.createElement("input");
+        passInput.className = "input";
+        passInput.placeholder = "重置口令（可选）";
+
+        const btnSave = document.createElement("button");
+        btnSave.className = "btn primary";
+        btnSave.textContent = "保存";
+        btnSave.addEventListener("click", async () => {
+          try {
+            await api(`/api/admin/users/${encodeURIComponent(u.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                role: roleSel.value,
+                passcode: (passInput.value || "").trim() || undefined,
+              }),
+            });
+            adminMsg.textContent = "已保存。";
+            await refreshUsers();
+          } catch (e) {
+            adminMsg.textContent = `保存失败：${e.message || e}`;
+          }
+        });
+
+        const btnDel = document.createElement("button");
+        btnDel.className = "btn danger";
+        btnDel.textContent = "删除";
+        btnDel.addEventListener("click", async () => {
+          const ok = confirm(`确定删除用户 ${u.username} 吗？`);
+          if (!ok) return;
+          try {
+            await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "DELETE" });
+            adminMsg.textContent = "已删除。";
+            await refreshUsers();
+          } catch (e) {
+            adminMsg.textContent = `删除失败：${e.message || e}`;
+          }
+        });
+
+        row.appendChild(name);
+        row.appendChild(pill);
+        row.appendChild(created);
+        row.appendChild(roleSel);
+        row.appendChild(passInput);
+        row.appendChild(btnSave);
+        row.appendChild(btnDel);
+
+        usersList.appendChild(row);
       }
-    } else {
-      if (btnUsersMore) {
-        btnUsersMore.disabled = true;
-        btnUsersMore.textContent = "加载中…";
-      }
-    }
-
-    const data = await api(`/api/admin/users?limit=${adminUsersLimit}&offset=${adminUsersOffset}`, { method: "GET" });
-    const users = data.items || [];
-    const page = data.page || {};
-
-    usersEmpty.classList.toggle("hidden", (adminUsersOffset + users.length) !== 0);
-
-    for (const u of users) {
-      const row = document.createElement("div");
-      row.className = "userRow";
-
-      const name = document.createElement("div");
-      name.className = "u";
-      name.textContent = u.username;
-
-      const pill = document.createElement("div");
-      pill.className = "pill";
-      pill.textContent = u.role;
-
-      const created = document.createElement("div");
-      created.className = "smallmuted";
-      created.textContent = `创建：${formatTime(u.createdAt)}  更新：${formatTime(u.updatedAt)}`;
-
-      const roleSel = document.createElement("select");
-      roleSel.className = "select";
-      roleSel.innerHTML = `<option value="user">普通用户</option><option value="admin">管理员</option>`;
-      roleSel.value = u.role;
-
-      const passInput = document.createElement("input");
-      passInput.className = "input";
-      passInput.placeholder = "重置口令（可选）";
-
-      const btnSave = document.createElement("button");
-      btnSave.className = "btn primary";
-      btnSave.textContent = "保存";
-      btnSave.addEventListener("click", async () => {
-        try {
-          await api(`/api/admin/users/${encodeURIComponent(u.id)}`, {
-            method: "PATCH",
-            body: JSON.stringify({
-              role: roleSel.value,
-              passcode: (passInput.value || "").trim() || undefined,
-            }),
-          });
-          adminMsg.textContent = "已保存。";
-          await refreshUsers(true);
-        } catch (e) {
-          adminMsg.textContent = `保存失败：${e.message || e}`;
-        }
-      });
-
-      const btnDel = document.createElement("button");
-      btnDel.className = "btn danger";
-      btnDel.textContent = "删除";
-      btnDel.addEventListener("click", async () => {
-        const ok = confirm(`确定删除用户 ${u.username} 吗？`);
-        if (!ok) return;
-        try {
-          await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "DELETE" });
-          adminMsg.textContent = "已删除。";
-          await refreshUsers(true);
-        } catch (e) {
-          adminMsg.textContent = `删除失败：${e.message || e}`;
-        }
-      });
-
-      row.appendChild(name);
-      row.appendChild(pill);
-      row.appendChild(created);
-      row.appendChild(roleSel);
-      row.appendChild(passInput);
-      row.appendChild(btnSave);
-      row.appendChild(btnDel);
-
-      usersList.appendChild(row);
-    }
-
-    adminUsersOffset += users.length;
-
-    if (typeof page.total === "number") adminUsersTotal = page.total;
-    if (typeof page.hasMore === "boolean") adminUsersHasMore = page.hasMore;
-    else adminUsersHasMore = users.length === adminUsersLimit;
-
-    if (btnUsersMore) {
-      btnUsersMore.classList.toggle("hidden", !adminUsersHasMore);
-      btnUsersMore.disabled = !adminUsersHasMore;
-      btnUsersMore.textContent = "加载更多";
-    }
-    if (usersMoreMsg) {
-      usersMoreMsg.textContent = adminUsersTotal != null
-        ? `已加载 ${adminUsersOffset}/${adminUsersTotal}`
-        : `已加载 ${adminUsersOffset}`;
-    }
-  } catch (e) {
-    adminMsg.textContent = `加载用户失败：${e.message || e}`;
-    if (btnUsersMore) {
-      btnUsersMore.disabled = false;
-      btnUsersMore.textContent = "加载更多";
+    } catch (e) {
+      adminMsg.textContent = `加载用户失败：${e.message || e}`;
     }
   }
-}
-
-
 
 
   function setAdminTab(which){
@@ -788,21 +733,151 @@ let adminNotesDebounce = 0;
     else adminNotesOwner.value = "";
   }
 
-  function openAdminNoteView(n) {
-    if (!adminNoteViewModal) return;
-    adminNoteViewTitle.textContent = n.title || "(无标题)";
-    const meta = `创建者：${ownerLabel(n)} · 创建：${formatTime(n.createdAt || "")} · 更新：${formatTime(n.updatedAt || "")}`;
-    adminNoteViewMeta.textContent = meta;
-    adminNoteViewBody.textContent = n.body || "";
-    adminNoteViewMask.classList.remove("hidden");
-    adminNoteViewModal.classList.remove("hidden");
+  
+// --- Admin: Note full-view (better UI)
+let __adminNoteViewReady = false;
+
+function ensureAdminNoteViewer() {
+  if (__adminNoteViewReady) return;
+
+  let mask = document.getElementById("adminNoteViewMask");
+  let modal = document.getElementById("adminNoteViewModal");
+
+  if (!mask) {
+    mask = document.createElement("div");
+    mask.id = "adminNoteViewMask";
+    mask.className = "mask hidden";
+    document.body.appendChild(mask);
+  }
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "adminNoteViewModal";
+    modal.className = "modal hidden";
+    modal.innerHTML = `
+      <div class="modalHeader">
+        <div class="modalTitle" id="adminNoteViewTitle">(无标题)</div>
+        <button class="iconBtn" id="btnAdminNoteViewX" type="button" title="关闭">✕</button>
+      </div>
+      <div class="modalBody">
+        <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;">
+          <div class="smallmuted" id="adminNoteViewMeta"></div>
+          <span class="spacer"></span>
+          <div class="adminNoteViewActions">
+            <button class="btn small" id="btnAdminNoteCopy" type="button">复制内容</button>
+            <button class="btn small" id="btnAdminNoteCopyAll" type="button">复制标题+内容</button>
+            <button class="btn small" id="btnAdminNoteDownload" type="button">下载 TXT</button>
+            <button class="btn small" id="btnAdminNoteViewClose" type="button">关闭</button>
+          </div>
+        </div>
+        <div class="adminNoteViewBodyWrap">
+          <pre class="adminNoteViewBody" id="adminNoteViewBody"></pre>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
   }
 
-  function closeAdminNoteView() {
-    if (!adminNoteViewModal) return;
-    adminNoteViewMask.classList.add("hidden");
-    adminNoteViewModal.classList.add("hidden");
+  const close = () => closeAdminNoteView();
+
+  // click mask to close
+  mask.addEventListener("click", close);
+
+  // close buttons
+  modal.querySelector("#btnAdminNoteViewClose")?.addEventListener("click", close);
+  modal.querySelector("#btnAdminNoteViewX")?.addEventListener("click", close);
+
+  // ESC to close
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const mm = document.getElementById("adminNoteViewModal");
+      if (mm && !mm.classList.contains("hidden")) close();
+    }
+  });
+
+  __adminNoteViewReady = true;
+}
+
+async function __copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (_) {
+    // fallback
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (e) {
+      return false;
+    }
   }
+}
+
+function openAdminNoteView(n) {
+  ensureAdminNoteViewer();
+
+  const mask = document.getElementById("adminNoteViewMask");
+  const modal = document.getElementById("adminNoteViewModal");
+  const titleEl = document.getElementById("adminNoteViewTitle");
+  const metaEl = document.getElementById("adminNoteViewMeta");
+  const bodyEl = document.getElementById("adminNoteViewBody");
+
+  if (!mask || !modal || !titleEl || !metaEl || !bodyEl) {
+    // fallback (shouldn't happen)
+    alert(((n?.title || "(无标题)") + "\n\n" + (n?.body || "")).trim());
+    return;
+  }
+
+  const t = (n?.title || "(无标题)").trim() || "(无标题)";
+  const b = (n?.body || "");
+  titleEl.textContent = t;
+
+  const idText = n?.id ? ` · ${n.id}` : "";
+  const meta = `创建者：${ownerLabel(n)} · 创建：${formatTime(n.createdAt || "")} · 更新：${formatTime(n.updatedAt || "")}${idText}`;
+  metaEl.textContent = meta;
+
+  bodyEl.textContent = b;
+
+  // actions
+  modal.querySelector("#btnAdminNoteCopy")?.addEventListener("click", async () => {
+    await __copyToClipboard(b || "");
+  }, { once: true });
+
+  modal.querySelector("#btnAdminNoteCopyAll")?.addEventListener("click", async () => {
+    await __copyToClipboard((t + "\n\n" + (b || "")).trim());
+  }, { once: true });
+
+  modal.querySelector("#btnAdminNoteDownload")?.addEventListener("click", () => {
+    try {
+      const blob = new Blob([b || ""], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = (t || "note") + ".txt";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (_) {}
+  }, { once: true });
+
+  mask.classList.remove("hidden");
+  modal.classList.remove("hidden");
+
+  // scroll to top
+  bodyEl.parentElement?.scrollTo?.({ top: 0 });
+}
+
+function closeAdminNoteView() {
+  const mask = document.getElementById("adminNoteViewMask");
+  const modal = document.getElementById("adminNoteViewModal");
+  if (mask) mask.classList.add("hidden");
+  if (modal) modal.classList.add("hidden");
+}
 
   function renderAdminNotes() {
     const q = (adminNotesSearch.value || "").trim().toLowerCase();
@@ -861,102 +936,19 @@ let adminNotesDebounce = 0;
   }
 
 
-async function refreshAdminNotes(reset = true) {
-  try {
-    if (reset) {
-      adminNotesOffset = 0;
-      adminNotesTotal = null;
-      adminNotesHasMore = false;
-      adminNotesList.innerHTML = "";
+async function refreshAdminNotes() {
+    adminNotesMsg.textContent = "加载中…";
+    try {
+      const data = await api("/api/admin/notes", { method: "GET" });
+      adminNotes = data.notes || data || [];
+      adminNotesLoaded = true;
       adminNotesMsg.textContent = "";
-      if (adminNotesMoreMsg) adminNotesMoreMsg.textContent = "";
-      if (btnAdminNotesMore) {
-        btnAdminNotesMore.classList.add("hidden");
-        btnAdminNotesMore.disabled = true;
-        btnAdminNotesMore.textContent = "加载更多";
-      }
-    } else {
-      if (btnAdminNotesMore) {
-        btnAdminNotesMore.disabled = true;
-        btnAdminNotesMore.textContent = "加载中…";
-      }
-    }
-
-    const q = (adminNotesSearch.value || "").trim();
-    const ownerId = String(adminNotesOwner.value || "").trim();
-
-    const params = new URLSearchParams();
-    params.set("limit", String(adminNotesLimit));
-    params.set("offset", String(adminNotesOffset));
-    if (q) params.set("q", q);
-    if (ownerId) params.set("ownerId", ownerId);
-
-    const data = await api(`/api/admin/notes?${params.toString()}`, { method: "GET" });
-    const list = data.items || data.notes || [];
-    const page = data.page || {};
-
-    adminNotesEmpty.classList.toggle("hidden", (adminNotesOffset + list.length) !== 0);
-
-    for (const n of list) {
-      const row = document.createElement("div");
-      row.className = "userRow";
-
-      const main = document.createElement("div");
-      main.className = "adminNoteMain";
-
-      const t = document.createElement("div");
-      t.className = "u";
-      t.textContent = n.title || "(无标题)";
-
-      const b = document.createElement("div");
-      b.className = "smallmuted";
-      const owner = n.ownerUsername ? `${n.ownerUsername}` : `${n.ownerType || ""}:${n.ownerId || ""}`;
-      b.textContent = `${owner} · 更新：${formatTime(n.updatedAt || n.updatedAt)} · ${String(n.id || "")}`;
-
-      main.appendChild(t);
-      main.appendChild(b);
-
-      const btn = document.createElement("button");
-      btn.className = "btn";
-      btn.textContent = "查看全文";
-      btn.addEventListener("click", () => {
-        alert(`${n.title || "(无标题)"}
-
-${n.body || ""}`);
-      });
-
-      row.appendChild(main);
-      row.appendChild(btn);
-      adminNotesList.appendChild(row);
-    }
-
-    adminNotesOffset += list.length;
-
-    if (typeof page.total === "number") adminNotesTotal = page.total;
-    if (typeof page.hasMore === "boolean") adminNotesHasMore = page.hasMore;
-    else adminNotesHasMore = list.length === adminNotesLimit;
-
-    if (btnAdminNotesMore) {
-      btnAdminNotesMore.classList.toggle("hidden", !adminNotesHasMore);
-      btnAdminNotesMore.disabled = !adminNotesHasMore;
-      btnAdminNotesMore.textContent = "加载更多";
-    }
-    if (adminNotesMoreMsg) {
-      adminNotesMoreMsg.textContent = adminNotesTotal != null
-        ? `已加载 ${adminNotesOffset}/${adminNotesTotal}`
-        : `已加载 ${adminNotesOffset}`;
-    }
-
-  } catch (e) {
-    adminNotesMsg.textContent = `加载备忘录失败：${e.message || e}`;
-    if (btnAdminNotesMore) {
-      btnAdminNotesMore.disabled = false;
-      btnAdminNotesMore.textContent = "加载更多";
+      rebuildAdminNotesOwners();
+      renderAdminNotes();
+    } catch (e) {
+      adminNotesMsg.textContent = "加载失败：" + (e.message || e);
     }
   }
-}
-
-
 
   async function createUser() {
     const u = (newUsername.value || "").trim();
@@ -1029,9 +1021,9 @@ ${n.body || ""}`);
       const data = await api("/api/share/create", {
         method: "POST",
         body: JSON.stringify({
-          memoId: shareForMemoId,
+          noteId: shareForMemoId,
           burnAfterRead: burn,
-          expiresInSeconds: (expireHours > 0 ? Math.round(expireHours * 3600) : 0),
+          expireHours: expireHours || 0,
         }),
       });
       // data: { url } or { token } depending on backend

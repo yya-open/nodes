@@ -377,33 +377,34 @@ body{
 .shareLabel{ display:flex; gap:10px; align-items:center; color:rgba(255,255,255,.88); }
 .shareHint{ color:rgba(255,255,255,.7); font-size:12px; }
 
-/* ========== Admin 弹窗：内部列表可滚动（用户/备忘录） ========== */
+/* 让管理员弹窗内部可滚动 */
 #adminModal{
   max-height: 90vh;
   height: 90vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden;     /* 关键：外层不滚，交给内部滚动 */
 }
 
-#adminModal .modalBody{
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
-
-#adminModal .tabs{
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  padding: 6px 0 10px;
-  background: rgba(18,26,51,.92);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255,255,255,.08);
-}
-
+/* 两个 tab 面板负责滚动（你代码里就是这俩） */
 #adminPanelUsers,
 #adminPanelNotes{
+  flex: 1 1 auto;
+  min-height: 0;        /* 关键：让 flex 子元素允许变小，从而出现滚动条 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========== Admin 备忘录「查看全文」弹窗优化 ========== */
+#adminNoteViewModal{
+  width: min(980px, calc(100vw - 24px));
+  max-height: 86vh;
+  height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#adminNoteViewModal .modalBody{
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -411,22 +412,45 @@ body{
   gap: 12px;
 }
 
-#usersList,
-#adminNotesList{
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  padding-right: 6px;
+#adminNoteViewMeta{
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
-#usersList::-webkit-scrollbar,
-#adminNotesList::-webkit-scrollbar{ width: 10px; }
-#usersList::-webkit-scrollbar-thumb,
-#adminNotesList::-webkit-scrollbar-thumb{
-  background: rgba(255,255,255,.16);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+.adminNoteViewActions{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.adminNoteViewBodyWrap{
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  overflow: hidden;
+}
+
+.adminNoteViewBody{
+  margin: 0;
+  padding: 14px 14px;
+  height: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.65;
+  color: rgba(231,236,255,.92);
+  font-size: 14px;
+}
+
+@media (max-width: 520px){
+  #adminNoteViewModal{
+    height: 92vh;
+    max-height: 92vh;
+  }
+  .adminNoteViewBody{ padding: 12px; }
 }
