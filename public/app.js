@@ -65,6 +65,122 @@
 
   // ---- dom
   const $ = (id) => document.getElementById(id);
+  // ---- UI helpers (replace native alert/confirm)
+  const toastHost = $("toastHost");
+  const sysMask = $("sysMask");
+  const sysModal = $("sysModal");
+  const sysTitle = $("sysTitle");
+  const sysMsg = $("sysMsg");
+  const btnSysOk = $("btnSysOk");
+  const btnSysCancel = $("btnSysCancel");
+  const btnSysClose = $("btnSysClose");
+
+  let sysResolve = null;
+  let sysHasCancel = false;
+
+  function toast(text, type = "info", title) {
+    if (!toastHost) return;
+    const t = document.createElement("div");
+    t.className = `toast ${type}`;
+
+    const icon = document.createElement("div");
+    icon.className = "toastIcon";
+    icon.textContent = type === "error" ? "⚠️" : (type === "success" ? "✅" : "ℹ️");
+
+    const body = document.createElement("div");
+    body.className = "toastBody";
+
+    const ttl = document.createElement("div");
+    ttl.className = "toastTitle";
+    ttl.textContent = title || (type === "error" ? "出错了" : (type === "success" ? "完成" : "提示"));
+
+    const msg = document.createElement("div");
+    msg.className = "toastText";
+    msg.textContent = String(text || "");
+
+    body.appendChild(ttl);
+    body.appendChild(msg);
+
+    t.appendChild(icon);
+    t.appendChild(body);
+
+    toastHost.appendChild(t);
+
+    // auto-dismiss
+    window.setTimeout(() => {
+      t.style.opacity = "0";
+      t.style.transform = "translateY(6px)";
+      window.setTimeout(() => t.remove(), 160);
+    }, 2600);
+  }
+
+  function openSysDialog({ title = "提示", message = "", okText = "确定", cancelText = null, danger = false } = {}) {
+    if (!sysMask || !sysModal || !sysTitle || !sysMsg || !btnSysOk) {
+      // last resort fallback (should be rare)
+      return Promise.resolve(window.confirm ? window.confirm(String(message || "")) : true);
+    }
+
+    sysHasCancel = !!cancelText;
+    sysTitle.textContent = String(title || "提示");
+    sysMsg.textContent = String(message || "");
+
+    btnSysOk.textContent = String(okText || "确定");
+    btnSysOk.classList.toggle("danger", !!danger);
+    btnSysOk.classList.toggle("primary", !danger);
+
+    if (btnSysCancel) {
+      btnSysCancel.textContent = String(cancelText || "取消");
+      btnSysCancel.classList.toggle("hidden", !cancelText);
+    }
+
+    sysMask.classList.remove("hidden");
+    sysModal.classList.remove("hidden");
+
+    // focus primary action
+    window.setTimeout(() => btnSysOk.focus(), 0);
+
+    return new Promise((resolve) => {
+      sysResolve = resolve;
+    });
+  }
+
+  function closeSysDialog(result) {
+    if (!sysMask || !sysModal) return;
+    sysMask.classList.add("hidden");
+    sysModal.classList.add("hidden");
+    const r = sysResolve;
+    sysResolve = null;
+    if (typeof r === "function") r(!!result);
+  }
+
+  if (btnSysOk) btnSysOk.addEventListener("click", () => closeSysDialog(true));
+  if (btnSysCancel) btnSysCancel.addEventListener("click", () => closeSysDialog(false));
+  if (btnSysClose) btnSysClose.addEventListener("click", () => closeSysDialog(false));
+  if (sysMask) sysMask.addEventListener("click", () => closeSysDialog(false));
+  document.addEventListener("keydown", (e) => {
+    if (!sysModal || sysModal.classList.contains("hidden")) return;
+    if (e.key === "Escape") closeSysDialog(false);
+  });
+
+  function uiConfirm(message, opts = {}) {
+    return openSysDialog({
+      title: opts.title || "请确认",
+      message,
+      okText: opts.okText || "确定",
+      cancelText: opts.cancelText || "取消",
+      danger: !!opts.danger,
+    });
+  }
+
+  function uiAlert(message, opts = {}) {
+    return openSysDialog({
+      title: opts.title || "提示",
+      message,
+      okText: opts.okText || "知道了",
+      cancelText: null,
+      danger: false,
+    });
+  }
 
   const listEl = $("list");
   const emptyEl = $("empty");
@@ -349,7 +465,7 @@
           Object.assign(x, updated);
           render();
         } catch (e) {
-          alert(e.message || e);
+          toast(e.message || e, "error");
           chk.checked = !!x.done;
         }
       });
@@ -420,7 +536,7 @@
           Object.assign(x, updated);
           render();
         } catch (err) {
-          alert(err.message || err);
+          toast(err.message || err, "error");
         }
       });
 
@@ -480,7 +596,7 @@
     const pinned = !!mPinnedEl.checked;
 
     if (!title && !body) {
-      alert("标题和内容至少填写一个。");
+      toast("标题和内容至少填写一个。", "error");
       return;
     }
 
@@ -496,20 +612,20 @@
       closeMemoModal();
       await loadNotes();
     } catch (e) {
-      alert(e.message || e);
+      toast(e.message || e, "error");
     }
   }
 
   async function doDeleteMemo() {
     if (!editingId) return;
-    const ok = confirm("确定删除这条备忘录吗？");
+    const ok = await uiConfirm("确定删除这条备忘录吗？", { title: "删除备忘录", danger: true });
     if (!ok) return;
     try {
       await deleteNote(editingId);
       closeMemoModal();
       await loadNotes();
     } catch (e) {
-      alert(e.message || e);
+      toast(e.message || e, "error");
     }
   }
 
@@ -536,7 +652,7 @@
       arr = JSON.parse(text);
       if (!Array.isArray(arr)) throw new Error("JSON 应为数组");
     } catch (e) {
-      alert("导入失败：JSON 格式不正确");
+      toast("导入失败：JSON 格式不正确", "error");
       return;
     }
     // 逐条创建（简单可靠）
@@ -555,7 +671,7 @@
         fail++;
       }
     }
-    alert(`导入完成：成功 ${ok} 条，失败 ${fail} 条`);
+    toast(`导入完成：成功 ${ok} 条，失败 ${fail} 条`, "success");
     await loadNotes();
   }
 
@@ -655,7 +771,7 @@
         btnDel.className = "btn danger";
         btnDel.textContent = "删除";
         btnDel.addEventListener("click", async () => {
-          const ok = confirm(`确定删除用户 ${u.username} 吗？`);
+          const ok = await uiConfirm(`确定删除用户 ${u.username} 吗？`, { title: "删除用户", danger: true });
           if (!ok) return;
           try {
             await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "DELETE" });
@@ -831,7 +947,7 @@ function openAdminNoteView(n) {
 
   if (!mask || !modal || !titleEl || !metaEl || !bodyEl) {
     // fallback (shouldn't happen)
-    alert(((n?.title || "(无标题)") + "\n\n" + (n?.body || "")).trim());
+    uiAlert(((n?.title || "(无标题)") + "\n\n" + (n?.body || "")).trim(), { title: "备忘录详情" });
     return;
   }
 
@@ -993,11 +1109,11 @@ async function refreshAdminNotes() {
 
   async function openShareModal(memoId) {
     if (!memoId) {
-      alert("请先保存备忘录后再分享。");
+      toast("请先保存备忘录后再分享。", "error");
       return;
     }
     if (!me || !me.authenticated) {
-      alert("请先登录后再分享。");
+      toast("请先登录后再分享。", "error");
       return;
     }
     shareForMemoId = memoId;

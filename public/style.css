@@ -485,3 +485,59 @@ body{
   padding-right: 6px;
 }
 
+
+/* --- System dialog + toast (replace native alert/confirm) --- */
+.modal.modal-sm{
+  width: min(520px, calc(100vw - 24px));
+}
+.dialogMessage{
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.toastHost{
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(520px, calc(100vw - 24px));
+  pointer-events: none;
+}
+.toast{
+  pointer-events: auto;
+  display:flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(18,26,51,.92);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  animation: toastIn .18s ease-out;
+}
+.toastIcon{
+  width: 22px; height: 22px;
+  display:grid; place-items:center;
+  border-radius: 10px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.toastBody{ flex:1; min-width: 0; }
+.toastTitle{ font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.toastText{ color: var(--muted); font-size: 13px; line-height: 1.45; word-break: break-word; }
+
+.toast.error .toastIcon{ background: rgba(255,92,122,.12); border-color: rgba(255,92,122,.25); }
+.toast.success .toastIcon{ background: rgba(91,124,250,.12); border-color: rgba(91,124,250,.25); }
+
+@keyframes toastIn{
+  from{ opacity: 0; transform: translateY(8px); }
+  to{ opacity: 1; transform: translateY(0); }
+}

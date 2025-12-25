@@ -312,6 +312,25 @@
   </div>
 
 
+  <!-- System Dialog (replaces browser alert/confirm) -->
+  <div id="sysMask" class="mask hidden"></div>
+  <div id="sysModal" class="modal hidden modal-sm" role="dialog" aria-modal="true" aria-label="提示">
+    <div class="modalHeader">
+      <div id="sysTitle" class="modalTitle">提示</div>
+      <button id="btnSysClose" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+    <div class="modalBody">
+      <div id="sysMsg" class="dialogMessage"></div>
+    </div>
+    <div class="modalFooter">
+      <button id="btnSysCancel" class="btn">取消</button>
+      <div class="spacer"></div>
+      <button id="btnSysOk" class="btn primary">确定</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toastHost" class="toastHost" aria-live="polite" aria-atomic="true"></div>
   <script src="./app.js"></script>
 </body>
 </html>
