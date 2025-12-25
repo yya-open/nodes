@@ -538,6 +538,8 @@
   bindAdminTabs();
   // ✅ 默认进入用户 Tab（或者你想默认 notes 也行）
   setAdminTab("users");
+  // ✅ 关键：立刻拉取用户列表
+  refreshUsers();
 }
   function bindAdminTabs() {
   const tabUsers = document.getElementById("adminTabUsers");
@@ -650,14 +652,23 @@
   }
 
 
-  function setAdminTab(tab) {
-    const isUsers = tab === "users";
-    adminTabUsers.classList.toggle("active", isUsers);
-    adminTabNotes.classList.toggle("active", !isUsers);
-    adminPanelUsers.classList.toggle("hidden", !isUsers);
-    adminPanelNotes.classList.toggle("hidden", isUsers);
-    if (!isUsers && !adminNotesLoaded) refreshAdminNotes();
-  }
+  function setAdminTab(which){
+  const tabUsers = document.getElementById("adminTabUsers");
+  const tabNotes = document.getElementById("adminTabNotes");
+  const panelUsers = document.getElementById("adminPanelUsers");
+  const panelNotes = document.getElementById("adminPanelNotes");
+
+  const isNotes = which === "notes";
+  tabUsers?.classList.toggle("active", !isNotes);
+  tabNotes?.classList.toggle("active", isNotes);
+
+  panelUsers?.classList.toggle("hidden", isNotes);
+  panelNotes?.classList.toggle("hidden", !isNotes);
+
+  // ✅ 关键：切到哪个 tab 就加载哪个
+  if (isNotes) refreshAdminNotes?.();
+  else refreshUsers();
+}
 
   function renderAdminNotes() {
     const q = (adminNotesSearch.value || "").trim().toLowerCase();

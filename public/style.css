@@ -289,3 +289,39 @@ body{
   border:1px solid var(--line);
   color: var(--muted);
 }
+/* Admin tabs */
+.tabbar{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin: 6px 0 12px;
+}
+
+.tabbtn{
+  appearance:none;
+  border:1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.82);
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .06s ease, background .15s ease, border-color .15s ease;
+}
+
+.tabbtn:hover{
+  background: rgba(255,255,255,.10);
+  border-color: rgba(255,255,255,.22);
+}
+
+.tabbtn:active{
+  transform: translateY(1px);
+}
+
+.tabbtn.active{
+  background: rgba(59,130,246,.22);
+  border-color: rgba(59,130,246,.55);
+  color: rgba(255,255,255,.95);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
