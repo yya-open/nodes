@@ -893,7 +893,7 @@ async function refreshAdminNotes() {
         body: JSON.stringify({
           noteId: shareForMemoId,
           burnAfterRead: burn,
-          expireHours: expireHours || 0,
+          expiresInSeconds: (expireHours > 0 ? Math.round(expireHours * 3600) : 0) || 0,
         }),
       });
       // data: { url } or { token } depending on backend
