@@ -47,7 +47,6 @@
   const sortEl = $("sort");
 
   const whoEl = $("who");
-  const btnGuestTools = $("btnGuestTools");
   const btnSwitch = $("btnSwitch");
   const btnLogout = $("btnLogout");
   const btnAdmin = $("btnAdmin");
@@ -70,31 +69,22 @@
   const loginPass = $("loginPass");
   const loginMsg = $("loginMsg");
 
-  // guest tools modal (ids come from index.html)
-  const guestMask = $("guestMask");
-  const guestModal = $("guestModal");
-  const closeGuestModal = $("btnGuestClose");
-
-  // recovery
-  const guestCodeVal = $("guestCodeOut");
-  const btnGenRecovery = $("btnGenGuestCode");
-  const btnCopyRecovery = $("btnCopyGuestCode");
-  const guestRecoverCode = $("guestCodeIn");
-  const btnRecover = $("btnUseGuestCode");
-
-  // upgrade
-  const upgradeUsername = $("upgradeUsername");
-  const upgradePasscode = $("upgradePasscode");
-  const btnUpgrade = $("btnUpgrade");
-
-  const guestToolsMsg = $("guestMsg");
-
   // admin modal
   const adminMask = $("adminMask");
   const adminModal = $("adminModal");
   const usersList = $("usersList");
   const usersEmpty = $("usersEmpty");
   const adminMsg = $("adminMsg");
+
+const tabAdminUsers = $("tabAdminUsers");
+const tabAdminNotes = $("tabAdminNotes");
+const adminUsersPanel = $("adminUsersPanel");
+const adminNotesPanel = $("adminNotesPanel");
+const adminNotesList = $("adminNotesList");
+const adminNotesEmpty = $("adminNotesEmpty");
+const adminNotesMsg = $("adminNotesMsg");
+const adminNotesQuery = $("adminNotesQuery");
+const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
   const newUsername = $("newUsername");
   const newPasscode = $("newPasscode");
   const newRole = $("newRole");
@@ -115,13 +105,11 @@
     if (!me || !me.authenticated) {
       whoEl.classList.add("hidden");
       btnLogout.classList.add("hidden");
-      btnGuestTools.classList.add("hidden");
       return;
     }
     whoEl.classList.remove("hidden");
     const name = me.username ? me.username : (me.role === "guest" ? "游客" : "用户");
     whoEl.textContent = `${name} · ${me.role}`;
-    btnGuestTools.classList.toggle("hidden", me.role !== "guest");
   }
 
   function openLogin() {
@@ -450,7 +438,7 @@
     adminMsg.textContent = "";
     adminMask.classList.remove("hidden");
     adminModal.classList.remove("hidden");
-    refreshUsers();
+    setAdminTab("users");
   }
   function closeAdmin() {
     adminMask.classList.add("hidden");
@@ -538,6 +526,86 @@
     }
   }
 
+
+function setAdminTab(tab) {
+  if (tab === "notes") {
+    tabAdminNotes.classList.add("active");
+    tabAdminUsers.classList.remove("active");
+    adminNotesPanel.classList.remove("hidden");
+    adminUsersPanel.classList.add("hidden");
+    refreshAdminNotes();
+  } else {
+    tabAdminUsers.classList.add("active");
+    tabAdminNotes.classList.remove("active");
+    adminUsersPanel.classList.remove("hidden");
+    adminNotesPanel.classList.add("hidden");
+    refreshUsers();
+  }
+}
+
+function shortId(id) {
+  if (!id) return "";
+  return id.length <= 14 ? id : id.slice(0, 6) + "…" + id.slice(-6);
+}
+
+async function refreshAdminNotes() {
+  adminNotesMsg.textContent = "";
+  adminNotesList.innerHTML = "";
+  adminNotesEmpty.classList.add("hidden");
+  try {
+    const res = await api("/api/admin/notes");
+    const q = (adminNotesQuery.value || "").trim().toLowerCase();
+    const items = (res.items || []).filter((it) => {
+      if (!q) return true;
+      const hay = [it.title || "", it.body || "", it.ownerUsername || "", it.ownerId || ""].join("\n").toLowerCase();
+      return hay.includes(q);
+    });
+
+    if (!items.length) {
+      adminNotesEmpty.classList.remove("hidden");
+      return;
+    }
+
+    for (const n of items) {
+      const wrap = document.createElement("div");
+      wrap.className = "noteAdminItem";
+
+      const top = document.createElement("div");
+      top.className = "noteAdminTop";
+
+      const title = document.createElement("div");
+      title.className = "noteAdminTitle";
+      title.textContent = n.title || "(无标题)";
+
+      const owner = document.createElement("span");
+      const creatorLabel = n.ownerType === "user"
+        ? (n.ownerUsername ? `用户：${n.ownerUsername}` : `用户：${shortId(n.ownerId)}`)
+        : `游客：${shortId(n.ownerId)}`;
+      owner.className = "badge " + (n.ownerType === "user" ? "user" : "guest");
+      owner.textContent = creatorLabel;
+
+      const updated = document.createElement("span");
+      updated.className = "badge";
+      updated.textContent = `更新：${formatTime(n.updatedAt)}`;
+
+      top.appendChild(title);
+      top.appendChild(owner);
+      top.appendChild(updated);
+
+      const preview = document.createElement("div");
+      preview.className = "smallmuted";
+      const text = (n.body || "").replace(/\s+/g, " ").trim();
+      preview.textContent = text ? (text.length > 160 ? text.slice(0, 160) + "…" : text) : "（无内容）";
+
+      wrap.appendChild(top);
+      wrap.appendChild(preview);
+      adminNotesList.appendChild(wrap);
+    }
+  } catch (e) {
+    adminNotesMsg.textContent = `加载失败：${e.message || e}`;
+  }
+}
+
   async function createUser() {
     const u = (newUsername.value || "").trim();
     const p = (newPasscode.value || "").trim();
@@ -588,103 +656,15 @@
   $("btnLoginCancel").addEventListener("click", closeLogin);
   loginMask.addEventListener("click", closeLogin);
 
-    // guest tools modal events
-  const setGuestMsg = (msg) => {
-    guestToolsMsg.textContent = msg;
-    guestToolsMsg.classList.remove("hidden");
-  };
-
-  const openGuestTools = () => {
-    guestToolsMsg.classList.add("hidden");
-    guestToolsMsg.textContent = "";
-    guestRecoverCode.value = "";
-    upgradeUsername.value = "";
-    upgradePasscode.value = "";
-    guestMask.classList.remove("hidden");
-    guestModal.classList.remove("hidden");
-  };
-
-  const closeGuestTools = () => {
-    guestMask.classList.add("hidden");
-    guestModal.classList.add("hidden");
-  };
-
-  // Bind guest tools events defensively (the guest tools UI may be removed in custom builds)
-  if (btnGuestTools && guestMask && guestModal) {
-    btnGuestTools.addEventListener("click", openGuestTools);
-    guestMask.addEventListener("click", closeGuestTools);
-    if (closeGuestModal) closeGuestModal.addEventListener("click", closeGuestTools);
-    const btnGuestCancel = $("btnGuestCancel");
-    if (btnGuestCancel) btnGuestCancel.addEventListener("click", closeGuestTools);
-  }
-
-  const btnCopyGuestCode = $("btnCopyGuestCode");
-  if (btnCopyGuestCode && guestCodeVal) {
-    btnCopyGuestCode.addEventListener("click", async () => {
-      const v = String(guestCodeVal.value || "").trim();
-      if (!v) return setGuestMsg("没有可复制的恢复码。");
-      try {
-        await navigator.clipboard.writeText(v);
-        setGuestMsg("已复制到剪贴板。");
-      } catch {
-        // Fallback for non-secure contexts
-        guestCodeVal.focus();
-        guestCodeVal.select();
-        document.execCommand?.("copy");
-        setGuestMsg("已尝试复制（若失败请手动复制）。");
-      }
-    });
-  }
-
-  if (btnGenRecovery) btnGenRecovery.addEventListener("click", async () => {
-    setGuestMsg("正在生成恢复码...");
-    try {
-      const r = await api("/api/auth/guest/code", { method: "POST" });
-      guestCodeVal.value = r?.code ? String(r.code) : "";
-      setGuestMsg("恢复码已生成，请妥善保存。");
-    } catch (e) {
-      setGuestMsg("生成失败：" + (e?.message || String(e)));
-    }
-  });
-
-  if (btnRecover) btnRecover.addEventListener("click", async () => {
-    const code = guestRecoverCode.value.trim();
-    if (!code) return setGuestMsg("请输入恢复码。");
-    setGuestMsg("正在恢复...");
-    try {
-      await api("/api/auth/guest/recover", {
-        method: "POST",
-        body: JSON.stringify({ code }),
-      });
-      await refreshMe();
-      await loadNotes();
-      closeGuestTools();
-    } catch (e) {
-      setGuestMsg("恢复失败：" + (e?.message || String(e)));
-    }
-  });
-
-  if (btnUpgrade) btnUpgrade.addEventListener("click", async () => {
-    const username = upgradeUsername.value.trim();
-    const passcode = upgradePasscode.value;
-    if (!username) return setGuestMsg("请输入新用户名。");
-    if (!passcode || passcode.length < 6) return setGuestMsg("请输入新口令（至少6位）。");
-    setGuestMsg("正在转正...");
-    try {
-      await api("/api/auth/guest/upgrade", {
-        method: "POST",
-        body: JSON.stringify({ username, passcode }),
-      });
-      await refreshMe();
-      await loadNotes();
-      closeGuestTools();
-    } catch (e) {
-      setGuestMsg("转正失败：" + (e?.message || String(e)));
-    }
-  });
-
-// admin modal events
+  // admin modal events
   btnAdmin.addEventListener("click", openAdmin);
+
+tabAdminUsers.addEventListener("click", () => setAdminTab("users"));
+tabAdminNotes.addEventListener("click", () => setAdminTab("notes"));
+btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
+adminNotesQuery.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") refreshAdminNotes();
+});
   $("btnAdminClose").addEventListener("click", closeAdmin);
   $("btnAdminCancel").addEventListener("click", closeAdmin);
   adminMask.addEventListener("click", closeAdmin);
