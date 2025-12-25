@@ -61,6 +61,7 @@
   const mDoneEl = $("mDone");
   const mPinnedEl = $("mPinned");
   const btnDeleteEl = $("btnDelete");
+  const btnShareEl = $("btnShare");
 
   // login modal
   const loginMask = $("loginMask");
@@ -318,6 +319,7 @@
 
     modalTitleEl.textContent = isEdit ? "编辑备忘录" : "新建备忘录";
     btnDeleteEl.classList.toggle("hidden", !isEdit);
+    btnShareEl?.classList.toggle("hidden", !isEdit);
 
     mTitleEl.value = x?.title || "";
     mBodyEl.value = x?.body || "";
@@ -391,6 +393,46 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  }
+
+
+  async function openShareModal(noteId) {
+    if (!noteId) {
+      alert("请先保存备忘录后再分享。");
+      return;
+    }
+    const burn = confirm("是否开启【阅后即焚】？\n\n确定：开启（打开一次即失效）\n取消：关闭");
+    let ttl = prompt("分享链接有效期（小时）。留空默认 168（7 天）。", "168");
+    let ttlHours = parseInt((ttl || "").trim(), 10);
+    if (!Number.isFinite(ttlHours) || ttlHours <= 0) ttlHours = 168;
+    if (ttlHours > 24 * 365) ttlHours = 24 * 365; // 最多一年
+
+    try {
+      const data = await api("/api/share/create", {
+        method: "POST",
+        body: JSON.stringify({
+          noteId,
+          note_id: noteId,
+          burn,
+          burn_after_read: burn,
+          ttlHours,
+          ttl_hours: ttlHours,
+        }),
+      });
+
+      const code = data.code || data.shareCode || data.share_code || data.id || data.token;
+      const url = data.url || (code ? `${location.origin}/share.html#${code}` : "");
+      if (!url) throw new Error("接口未返回分享链接");
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+        alert("分享链接已复制到剪贴板：\n" + url);
+      } else {
+        prompt("复制分享链接：", url);
+      }
+    } catch (e) {
+      alert("生成分享链接失败：" + (e?.message || e));
+    }
   }
 
   async function importJson(file) {
@@ -549,7 +591,7 @@
   $("btnCancel").addEventListener("click", closeMemoModal);
   $("btnSave").addEventListener("click", saveMemoModal);
   $("btnDelete").addEventListener("click", doDeleteMemo);
-  $("btnShare")?.addEventListener("click", () => openShareModal(editingId));
+  btnShareEl?.addEventListener("click", () => openShareModal(editingId));
   maskEl.addEventListener("click", closeMemoModal);
 
   // search/filter/sort
