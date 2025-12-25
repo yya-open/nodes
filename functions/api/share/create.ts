@@ -7,7 +7,14 @@ import { randomId } from "../../lib/crypto";
 type Body = {
   noteId: string;
   burnAfterRead?: boolean;
-  expiresInSeconds?: number; // optional
+  /**
+   * 兼容多种前端字段：
+   * - expiresInSeconds: 以秒为单位（旧/后端字段）
+   * - expiresInHours / expireHours: 以小时为单位（当前前端发送的是 expireHours）
+   */
+  expiresInSeconds?: number;
+  expiresInHours?: number;
+  expireHours?: number;
 };
 
 export async function onRequestPost(ctx: { request: Request; env: Env }) {
@@ -37,10 +44,20 @@ export async function onRequestPost(ctx: { request: Request; env: Env }) {
   if (!(p.role === "admin" || isOwner)) return err(403, "权限不足");
 
   const burn = !!body.burnAfterRead;
-  const expiresIn = Number(body.expiresInSeconds || 0);
+
+  // 优先使用 seconds；否则退化到 hours（前端传 expireHours）
+  let expiresInSeconds = Number(body.expiresInSeconds ?? 0);
+  if (!(Number.isFinite(expiresInSeconds) && expiresInSeconds > 0)) {
+    const h = Number((body as any).expireHours ?? (body as any).expiresInHours ?? 0);
+    if (Number.isFinite(h) && h > 0) {
+      expiresInSeconds = Math.round(h * 3600);
+    } else {
+      expiresInSeconds = 0;
+    }
+  }
   const now = Date.now();
   const createdAt = new Date(now).toISOString();
-  const expiresAt = expiresIn > 0 ? new Date(now + expiresIn * 1000).toISOString() : null;
+  const expiresAt = expiresInSeconds > 0 ? new Date(now + expiresInSeconds * 1000).toISOString() : null;
 
   const code = `s_${randomId(18)}`;
 
