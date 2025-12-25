@@ -24,16 +24,6 @@
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     } catch { return iso; }
   };
-
-  function escapeHtml(s) {
-    return String(s ?? "").replace(/[&<"'>]/g, (c) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    }[c]));
-  }
   const parseTags = (s) =>
     (s || "")
       .split(",")
@@ -45,9 +35,6 @@
   let me = { authenticated: false, role: "none" };
   let memos = [];
   let editingId = null;
-
-  let adminNotes = [];
-  let adminNotesLoaded = false;
 
   // ---- dom
   const $ = (id) => document.getElementById(id);
@@ -63,7 +50,6 @@
   const btnSwitch = $("btnSwitch");
   const btnLogout = $("btnLogout");
   const btnAdmin = $("btnAdmin");
-  const btnGuestTools = $("btnGuestTools");
 
   // memo modal
   const maskEl = $("modalMask");
@@ -75,61 +61,17 @@
   const mDoneEl = $("mDone");
   const mPinnedEl = $("mPinned");
   const btnDeleteEl = $("btnDelete");
-  const btnShareEl = $("btnShare");
 
   // login modal
   const loginMask = $("loginMask");
-  const guestToolsMask = $("guestToolsMask");
-  const guestToolsModal = $("guestToolsModal");
-  const btnGuestToolsClose = $("btnGuestToolsClose");
-  const btnGuestToolsCancel = $("btnGuestToolsCancel");
-  const btnGenRecover = $("btnGenRecover");
-  const btnCopyRecover = $("btnCopyRecover");
-  const recoverCodeOut = $("recoverCodeOut");
-  const recoverCodeIn = $("recoverCodeIn");
-  const btnUseRecover = $("btnUseRecover");
-  const upgradeUsername = $("upgradeUsername");
-  const upgradePasscode = $("upgradePasscode");
-  const btnGuestUpgrade = $("btnGuestUpgrade");
-  const guestToolsMsg = $("guestToolsMsg");
   const loginModal = $("loginModal");
   const loginUser = $("loginUser");
   const loginPass = $("loginPass");
   const loginMsg = $("loginMsg");
 
-  // share modal
-  const shareMask = $("shareMask");
-  const shareModal = $("shareModal");
-  const shareExpire = $("shareExpire");
-  const shareBurn = $("shareBurn");
-  const shareLink = $("shareLink");
-  const shareMsg = $("shareMsg");
-  const btnShareGen = $("btnShareGen");
-  const btnShareCopy = $("btnShareCopy");
-  const btnShareCancel = $("btnShareCancel");
-  const btnShareCloseX = $("btnShareCloseX");
-
-
   // admin modal
   const adminMask = $("adminMask");
   const adminModal = $("adminModal");
-  const adminTabUsers = $("adminTabUsers");
-  const adminTabNotes = $("adminTabNotes");
-  const adminPanelUsers = $("adminPanelUsers");
-  const adminPanelNotes = $("adminPanelNotes");
-  const adminNotesSearch = $("adminNotesSearch");
-  const adminNotesOwner = $("adminNotesOwner");
-  const adminNoteViewMask = $("adminNoteViewMask");
-  const adminNoteViewModal = $("adminNoteViewModal");
-  const adminNoteViewTitle = $("adminNoteViewTitle");
-  const adminNoteViewMeta = $("adminNoteViewMeta");
-  const adminNoteViewBody = $("adminNoteViewBody");
-  const btnAdminNoteViewClose = $("btnAdminNoteViewClose");
-  const btnAdminNoteViewX = $("btnAdminNoteViewX");
-  const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
-  const adminNotesList = $("adminNotesList");
-  const adminNotesEmpty = $("adminNotesEmpty");
-  const adminNotesMsg = $("adminNotesMsg");
   const usersList = $("usersList");
   const usersEmpty = $("usersEmpty");
   const adminMsg = $("adminMsg");
@@ -146,7 +88,6 @@
     }
     renderWho();
     btnAdmin.classList.toggle("hidden", me.role !== "admin");
-    btnGuestTools.classList.toggle("hidden", me.role !== "guest");
     btnLogout.classList.toggle("hidden", !me.authenticated);
   }
 
@@ -170,69 +111,6 @@
   function closeLogin() {
     loginMask.classList.add("hidden");
     loginModal.classList.add("hidden");
-
-
-    // ✅ 关闭时也清空输入框
-    loginUser.value = "";
-    loginPass.value = "";
-  }
-
-
-  function openGuestTools() {
-    guestToolsMsg.textContent = "";
-    recoverCodeOut.value = "";
-    recoverCodeIn.value = "";
-    upgradeUsername.value = "";
-    upgradePasscode.value = "";
-    guestToolsMask.classList.remove("hidden");
-    guestToolsModal.classList.remove("hidden");
-  }
-  function closeGuestTools() {
-    guestToolsMask.classList.add("hidden");
-    guestToolsModal.classList.add("hidden");
-  }
-
-  async function genRecoverCode() {
-    guestToolsMsg.textContent = "正在生成恢复码…";
-    try {
-      const data = await api("/api/auth/guest/code", { method: "POST", body: "{}" });
-      const code = data.code || data.recoveryCode || data.token || "";
-      recoverCodeOut.value = code;
-      guestToolsMsg.textContent = code ? "已生成恢复码（建议尽快使用）。" : "生成成功，但未返回 code。";
-    } catch (e) {
-      guestToolsMsg.textContent = "生成失败：" + (e.message || e);
-    }
-  }
-
-  async function useRecoverCode() {
-    const code = (recoverCodeIn.value || "").trim();
-    if (!code) return (guestToolsMsg.textContent = "请先输入恢复码。");
-    guestToolsMsg.textContent = "正在恢复…";
-    try {
-      await api("/api/auth/guest/recover", { method: "POST", body: JSON.stringify({ code }) });
-      guestToolsMsg.textContent = "恢复成功，正在刷新…";
-      await refreshMe();
-      await loadNotes();
-      closeGuestTools();
-    } catch (e) {
-      guestToolsMsg.textContent = "恢复失败：" + (e.message || e);
-    }
-  }
-
-  async function guestUpgrade() {
-    const username = (upgradeUsername.value || "").trim();
-    const passcode = (upgradePasscode.value || "").trim();
-    if (!username) return (guestToolsMsg.textContent = "请输入新用户名。");
-    if (passcode.length < 6) return (guestToolsMsg.textContent = "口令至少 6 位。");
-    guestToolsMsg.textContent = "正在转正并迁移…";
-    try {
-      await api("/api/auth/guest/upgrade", { method: "POST", body: JSON.stringify({ username, passcode }) });
-      await refreshMe();
-      await loadNotes();
-      closeGuestTools();
-    } catch (e) {
-      guestToolsMsg.textContent = "转正失败：" + (e.message || e);
-    }
   }
 
   async function loginAsGuest() {
@@ -242,9 +120,6 @@
       await refreshMe();
       await loadNotes();
       closeLogin();
-      // ✅ 成功后清空输入框
-      loginUser.value = "";
-      loginPass.value = "";
     } catch (e) {
       loginMsg.textContent = `进入失败：${e.message || e}`;
     }
@@ -263,9 +138,6 @@
       await refreshMe();
       await loadNotes();
       closeLogin();
-      // ✅ 成功后清空输入框
-      loginUser.value = "";
-      loginPass.value = "";
     } catch (e) {
       loginMsg.textContent = `登录失败：${e.message || e}`;
     }
@@ -446,7 +318,6 @@
 
     modalTitleEl.textContent = isEdit ? "编辑备忘录" : "新建备忘录";
     btnDeleteEl.classList.toggle("hidden", !isEdit);
-    btnShareEl.classList.toggle("hidden", !isEdit);
 
     mTitleEl.value = x?.title || "";
     mBodyEl.value = x?.body || "";
@@ -465,70 +336,7 @@
     modalEl.classList.add("hidden");
   }
 
-  
-  let sharingNoteId = null;
-
-  function openShareModal(noteId) {
-    sharingNoteId = noteId || null;
-    if (!sharingNoteId) {
-      alert("请先保存这条备忘录再分享。");
-      return;
-    }
-    shareMsg.textContent = "";
-    shareLink.value = "";
-    // default options
-    if (shareExpire) shareExpire.value = shareExpire.value || "86400";
-    if (shareBurn) shareBurn.checked = false;
-
-    shareMask.classList.remove("hidden");
-    shareModal.classList.remove("hidden");
-    setTimeout(() => btnShareGen?.focus(), 0);
-  }
-
-  function closeShareModal() {
-    sharingNoteId = null;
-    shareMask.classList.add("hidden");
-    shareModal.classList.add("hidden");
-  }
-
-  async function generateShare() {
-    if (!sharingNoteId) return;
-    shareMsg.textContent = "正在生成...";
-    try {
-      const expiresInSeconds = Number(shareExpire?.value || 0);
-      const burnAfterRead = !!shareBurn?.checked;
-
-      const r = await api("/api/share/create", {
-        method: "POST",
-        body: JSON.stringify({
-          noteId: sharingNoteId,
-          expiresInSeconds,
-          burnAfterRead,
-        }),
-      });
-
-      shareLink.value = r.url || "";
-      shareMsg.textContent = burnAfterRead ? "已生成（阅后即焚）。" : "已生成。";
-    } catch (e) {
-      shareMsg.textContent = `生成失败：${e.message || e}`;
-    }
-  }
-
-  async function copyShareLink() {
-    const v = (shareLink.value || "").trim();
-    if (!v) return;
-    try {
-      await navigator.clipboard.writeText(v);
-      shareMsg.textContent = "已复制到剪贴板。";
-    } catch {
-      // fallback
-      shareLink.select();
-      document.execCommand("copy");
-      shareMsg.textContent = "已复制到剪贴板。";
-    }
-  }
-
-async function saveMemoModal() {
+  async function saveMemoModal() {
     const title = (mTitleEl.value || "").trim();
     const body = (mBodyEl.value || "").trim();
     const tags = parseTags(mTagsEl.value);
@@ -617,40 +425,11 @@ async function saveMemoModal() {
 
   // ---- Admin UI
   function openAdmin() {
-  adminMsg.textContent = "";
-  adminMask.classList.remove("hidden");
-  adminModal.classList.remove("hidden");
-  // ✅ 每次打开都保证 Tab 事件绑定成功
-  bindAdminTabs();
-  // ✅ 默认进入用户 Tab（或者你想默认 notes 也行）
-  setAdminTab("users");
-  // ✅ 关键：立刻拉取用户列表
-  refreshUsers();
-}
-  function bindAdminTabs() {
-  const tabUsers = document.getElementById("adminTabUsers");
-  const tabNotes = document.getElementById("adminTabNotes");
-
-  // 元素还没渲染出来就直接返回（下次 openAdmin 再绑）
-  if (!tabUsers || !tabNotes) return;
-
-  // 防止重复绑定
-  if (!tabUsers.dataset.bound) {
-    tabUsers.dataset.bound = "1";
-    tabUsers.addEventListener("click", (e) => {
-      e.preventDefault();
-      setAdminTab("users");
-    });
+    adminMsg.textContent = "";
+    adminMask.classList.remove("hidden");
+    adminModal.classList.remove("hidden");
+    refreshUsers();
   }
-
-  if (!tabNotes.dataset.bound) {
-    tabNotes.dataset.bound = "1";
-    tabNotes.addEventListener("click", (e) => {
-      e.preventDefault();
-      setAdminTab("notes");
-    });
-  }
-}
   function closeAdmin() {
     adminMask.classList.add("hidden");
     adminModal.classList.add("hidden");
@@ -737,145 +516,6 @@ async function saveMemoModal() {
     }
   }
 
-
-  function setAdminTab(which){
-  const tabUsers = document.getElementById("adminTabUsers");
-  const tabNotes = document.getElementById("adminTabNotes");
-  const panelUsers = document.getElementById("adminPanelUsers");
-  const panelNotes = document.getElementById("adminPanelNotes");
-
-  const isNotes = which === "notes";
-  tabUsers?.classList.toggle("active", !isNotes);
-  tabNotes?.classList.toggle("active", isNotes);
-
-  panelUsers?.classList.toggle("hidden", isNotes);
-  panelNotes?.classList.toggle("hidden", !isNotes);
-
-  // ✅ 关键：切到哪个 tab 就加载哪个
-  if (isNotes) refreshAdminNotes?.();
-  else refreshUsers();
-}
-
-  function ownerLabel(n) {
-    if (n && n.ownerUsername) return `${n.ownerUsername} · user`;
-    if (n && n.ownerType === "guest") return "游客 · guest";
-    return (n && n.ownerId) ? String(n.ownerId) : "unknown";
-  }
-
-  function rebuildAdminNotesOwners() {
-    if (!adminNotesOwner) return;
-    const prev = (adminNotesOwner.value || "").trim();
-    const map = new Map();
-    for (const n of (adminNotes || [])) {
-      const id = String(n.ownerId || "").trim();
-      if (!id) continue;
-      map.set(id, ownerLabel(n));
-    }
-    // clear + rebuild
-    adminNotesOwner.innerHTML = "";
-    const optAll = document.createElement("option");
-    optAll.value = "";
-    optAll.textContent = "所有创建者";
-    adminNotesOwner.appendChild(optAll);
-
-    const items = Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "zh"));
-    for (const [id, label] of items) {
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = label;
-      adminNotesOwner.appendChild(opt);
-    }
-    if (prev && map.has(prev)) adminNotesOwner.value = prev;
-    else adminNotesOwner.value = "";
-  }
-
-  function openAdminNoteView(n) {
-    if (!adminNoteViewModal) return;
-    adminNoteViewTitle.textContent = n.title || "(无标题)";
-    const meta = `创建者：${ownerLabel(n)} · 创建：${formatTime(n.createdAt || "")} · 更新：${formatTime(n.updatedAt || "")}`;
-    adminNoteViewMeta.textContent = meta;
-    adminNoteViewBody.textContent = n.body || "";
-    adminNoteViewMask.classList.remove("hidden");
-    adminNoteViewModal.classList.remove("hidden");
-  }
-
-  function closeAdminNoteView() {
-    if (!adminNoteViewModal) return;
-    adminNoteViewMask.classList.add("hidden");
-    adminNoteViewModal.classList.add("hidden");
-  }
-
-  function renderAdminNotes() {
-    const q = (adminNotesSearch.value || "").trim().toLowerCase();
-    const ownerSel = (adminNotesOwner && adminNotesOwner.value) ? adminNotesOwner.value.trim() : "";
-    const list = (adminNotes || []).filter((n) => {
-      if (ownerSel && String(n.ownerId || "") !== ownerSel) return false;
-      if (!q) return true;
-      const hay = `${n.title || ""} ${n.body || ""} ${n.ownerUsername || ""} ${n.ownerId || ""}`.toLowerCase();
-      return hay.includes(q);
-    });
-
-    adminNotesList.innerHTML = "";
-    adminNotesEmpty.classList.toggle("hidden", list.length !== 0);
-    if (list.length === 0) return;
-
-    for (const n of list) {
-      const row = document.createElement("div");
-      row.className = "userRow";
-
-      const main = document.createElement("div");
-      main.className = "adminNoteMain";
-
-      const title = document.createElement("div");
-      title.className = "adminNoteTitle";
-      title.textContent = n.title || "(无标题)";
-
-      const snippet = document.createElement("div");
-      snippet.className = "adminNoteSnippet";
-      snippet.textContent = (n.body || "").slice(0, 120);
-
-      const meta = document.createElement("div");
-      meta.className = "smallmuted";
-      meta.textContent = `创建者：${ownerLabel(n)} · 更新：${formatTime(n.updatedAt || "")}`;
-
-      main.appendChild(title);
-      main.appendChild(snippet);
-      main.appendChild(meta);
-
-      const spacer = document.createElement("div");
-      spacer.className = "spacer";
-
-      const btn = document.createElement("button");
-      btn.className = "btn small";
-      btn.type = "button";
-      btn.textContent = "查看全文";
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        openAdminNoteView(n);
-      });
-
-      row.appendChild(main);
-      row.appendChild(spacer);
-      row.appendChild(btn);
-      adminNotesList.appendChild(row);
-    }
-  }
-
-
-async function refreshAdminNotes() {
-    adminNotesMsg.textContent = "加载中…";
-    try {
-      const data = await api("/api/admin/notes", { method: "GET" });
-      adminNotes = data.notes || data || [];
-      adminNotesLoaded = true;
-      adminNotesMsg.textContent = "";
-      rebuildAdminNotesOwners();
-      renderAdminNotes();
-    } catch (e) {
-      adminNotesMsg.textContent = "加载失败：" + (e.message || e);
-    }
-  }
-
   async function createUser() {
     const u = (newUsername.value || "").trim();
     const p = (newPasscode.value || "").trim();
@@ -909,6 +549,7 @@ async function refreshAdminNotes() {
   $("btnCancel").addEventListener("click", closeMemoModal);
   $("btnSave").addEventListener("click", saveMemoModal);
   $("btnDelete").addEventListener("click", doDeleteMemo);
+  btnShareEl.addEventListener("click", () => openShareModal(editingId));
   maskEl.addEventListener("click", closeMemoModal);
 
   // search/filter/sort
@@ -928,39 +569,16 @@ async function refreshAdminNotes() {
 
   // admin modal events
   btnAdmin.addEventListener("click", openAdmin);
-  btnGuestTools.addEventListener("click", openGuestTools);
-  btnGuestToolsClose.addEventListener("click", closeGuestTools);
-  btnGuestToolsCancel.addEventListener("click", closeGuestTools);
-  guestToolsMask.addEventListener("click", closeGuestTools);
-  btnGenRecover.addEventListener("click", genRecoverCode);
-  btnCopyRecover.addEventListener("click", async () => {
-    try {
-      if (recoverCodeOut.value) await navigator.clipboard.writeText(recoverCodeOut.value);
-      guestToolsMsg.textContent = recoverCodeOut.value ? "已复制" : "没有可复制的恢复码";
-    } catch {
-      guestToolsMsg.textContent = "复制失败，请手动复制。";
-    }
-  });
-  btnUseRecover.addEventListener("click", useRecoverCode);
-  btnGuestUpgrade.addEventListener("click", guestUpgrade);
   $("btnAdminClose").addEventListener("click", closeAdmin);
   $("btnAdminCancel").addEventListener("click", closeAdmin);
   adminMask.addEventListener("click", closeAdmin);
   $("btnCreateUser").addEventListener("click", createUser);
-  // admin notes events
-  btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
-  adminNotesSearch.addEventListener("input", renderAdminNotes);
-  adminNotesOwner && adminNotesOwner.addEventListener("change", renderAdminNotes);
-  btnAdminNoteViewClose && btnAdminNoteViewClose.addEventListener("click", closeAdminNoteView);
-  btnAdminNoteViewX && btnAdminNoteViewX.addEventListener("click", closeAdminNoteView);
-  adminNoteViewMask && adminNoteViewMask.addEventListener("click", closeAdminNoteView);
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (!modalEl.classList.contains("hidden")) closeMemoModal();
       if (!loginModal.classList.contains("hidden")) closeLogin();
-      if (!adminNoteViewModal.classList.contains("hidden")) closeAdminNoteView();
-       if (!adminModal.classList.contains("hidden")) closeAdmin();
+      if (!adminModal.classList.contains("hidden")) closeAdmin();
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
@@ -978,14 +596,4 @@ async function refreshAdminNotes() {
     if (!me.authenticated) openLogin();
     else await loadNotes();
   })();
-
-  // share modal bindings
-  btnShareGen.addEventListener("click", generateShare);
-  btnShareCopy.addEventListener("click", copyShareLink);
-  btnShareCancel.addEventListener("click", closeShareModal);
-  btnShareCloseX.addEventListener("click", closeShareModal);
-  shareMask.addEventListener("click", closeShareModal);
-
 })();
-  btnShareEl.addEventListener("click", () => openShareModal(editingId));
-
