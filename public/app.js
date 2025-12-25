@@ -75,6 +75,7 @@
   const mDoneEl = $("mDone");
   const mPinnedEl = $("mPinned");
   const btnDeleteEl = $("btnDelete");
+  const btnShareEl = $("btnShare");
 
   // login modal
   const loginMask = $("loginMask");
@@ -95,6 +96,19 @@
   const loginUser = $("loginUser");
   const loginPass = $("loginPass");
   const loginMsg = $("loginMsg");
+
+  // share modal
+  const shareMask = $("shareMask");
+  const shareModal = $("shareModal");
+  const shareExpire = $("shareExpire");
+  const shareBurn = $("shareBurn");
+  const shareLink = $("shareLink");
+  const shareMsg = $("shareMsg");
+  const btnShareGen = $("btnShareGen");
+  const btnShareCopy = $("btnShareCopy");
+  const btnShareCancel = $("btnShareCancel");
+  const btnShareCloseX = $("btnShareCloseX");
+
 
   // admin modal
   const adminMask = $("adminMask");
@@ -432,6 +446,7 @@
 
     modalTitleEl.textContent = isEdit ? "编辑备忘录" : "新建备忘录";
     btnDeleteEl.classList.toggle("hidden", !isEdit);
+    btnShareEl.classList.toggle("hidden", !isEdit);
 
     mTitleEl.value = x?.title || "";
     mBodyEl.value = x?.body || "";
@@ -450,7 +465,70 @@
     modalEl.classList.add("hidden");
   }
 
-  async function saveMemoModal() {
+  
+  let sharingNoteId = null;
+
+  function openShareModal(noteId) {
+    sharingNoteId = noteId || null;
+    if (!sharingNoteId) {
+      alert("请先保存这条备忘录再分享。");
+      return;
+    }
+    shareMsg.textContent = "";
+    shareLink.value = "";
+    // default options
+    if (shareExpire) shareExpire.value = shareExpire.value || "86400";
+    if (shareBurn) shareBurn.checked = false;
+
+    shareMask.classList.remove("hidden");
+    shareModal.classList.remove("hidden");
+    setTimeout(() => btnShareGen?.focus(), 0);
+  }
+
+  function closeShareModal() {
+    sharingNoteId = null;
+    shareMask.classList.add("hidden");
+    shareModal.classList.add("hidden");
+  }
+
+  async function generateShare() {
+    if (!sharingNoteId) return;
+    shareMsg.textContent = "正在生成...";
+    try {
+      const expiresInSeconds = Number(shareExpire?.value || 0);
+      const burnAfterRead = !!shareBurn?.checked;
+
+      const r = await api("/api/share/create", {
+        method: "POST",
+        body: JSON.stringify({
+          noteId: sharingNoteId,
+          expiresInSeconds,
+          burnAfterRead,
+        }),
+      });
+
+      shareLink.value = r.url || "";
+      shareMsg.textContent = burnAfterRead ? "已生成（阅后即焚）。" : "已生成。";
+    } catch (e) {
+      shareMsg.textContent = `生成失败：${e.message || e}`;
+    }
+  }
+
+  async function copyShareLink() {
+    const v = (shareLink.value || "").trim();
+    if (!v) return;
+    try {
+      await navigator.clipboard.writeText(v);
+      shareMsg.textContent = "已复制到剪贴板。";
+    } catch {
+      // fallback
+      shareLink.select();
+      document.execCommand("copy");
+      shareMsg.textContent = "已复制到剪贴板。";
+    }
+  }
+
+async function saveMemoModal() {
     const title = (mTitleEl.value || "").trim();
     const body = (mBodyEl.value || "").trim();
     const tags = parseTags(mTagsEl.value);
@@ -900,4 +978,14 @@ async function refreshAdminNotes() {
     if (!me.authenticated) openLogin();
     else await loadNotes();
   })();
+
+  // share modal bindings
+  btnShareGen.addEventListener("click", generateShare);
+  btnShareCopy.addEventListener("click", copyShareLink);
+  btnShareCancel.addEventListener("click", closeShareModal);
+  btnShareCloseX.addEventListener("click", closeShareModal);
+  shareMask.addEventListener("click", closeShareModal);
+
 })();
+  btnShareEl.addEventListener("click", () => openShareModal(editingId));
+
