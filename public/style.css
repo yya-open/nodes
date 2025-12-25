@@ -325,3 +325,26 @@ body{
   color: rgba(255,255,255,.95);
   box-shadow: 0 0 0 3px rgba(59,130,246,.12);
 }
+
+/* Admin notes: creator filter + full view */
+.adminNoteMain{ flex: 1; min-width: 260px; display:flex; flex-direction:column; gap:6px; }
+.adminNoteTitle{ font-weight: 650; }
+.adminNoteSnippet{ color: rgba(255,255,255,.82); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.btn.small{
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1;
+}
+.pre{
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 10px 0 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.90);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+}

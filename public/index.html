@@ -182,6 +182,7 @@
       <div id="adminPanelNotes" class="hidden">
         <div class="row">
           <input id="adminNotesSearch" class="input" placeholder="搜索标题/内容/创建者…" />
+          <select id="adminNotesOwner" class="select"><option value="">所有创建者</option></select>
           <button id="btnAdminNotesRefresh" class="btn">刷新</button>
         </div>
         <div id="adminNotesList" class="list"></div>
@@ -245,6 +246,24 @@
       <div class="smallmuted">提示：恢复码仅用于恢复“游客身份”，不会公开你的数据。</div>
       <div class="spacer"></div>
       <button id="btnGuestToolsCancel" class="btn">关闭</button>
+    </div>
+  </div>
+
+
+  <!-- Admin Note View Modal -->
+  <div id="adminNoteViewMask" class="mask hidden"></div>
+  <div id="adminNoteViewModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalHeader">
+      <div class="modalTitle" id="adminNoteViewTitle">备忘录</div>
+      <button id="btnAdminNoteViewX" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+    <div class="modalBody">
+      <div id="adminNoteViewMeta" class="smallmuted"></div>
+      <pre id="adminNoteViewBody" class="pre"></pre>
+    </div>
+    <div class="modalFooter">
+      <div class="spacer"></div>
+      <button id="btnAdminNoteViewClose" class="btn">关闭</button>
     </div>
   </div>
 

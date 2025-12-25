@@ -104,6 +104,14 @@
   const adminPanelUsers = $("adminPanelUsers");
   const adminPanelNotes = $("adminPanelNotes");
   const adminNotesSearch = $("adminNotesSearch");
+  const adminNotesOwner = $("adminNotesOwner");
+  const adminNoteViewMask = $("adminNoteViewMask");
+  const adminNoteViewModal = $("adminNoteViewModal");
+  const adminNoteViewTitle = $("adminNoteViewTitle");
+  const adminNoteViewMeta = $("adminNoteViewMeta");
+  const adminNoteViewBody = $("adminNoteViewBody");
+  const btnAdminNoteViewClose = $("btnAdminNoteViewClose");
+  const btnAdminNoteViewX = $("btnAdminNoteViewX");
   const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
   const adminNotesList = $("adminNotesList");
   const adminNotesEmpty = $("adminNotesEmpty");
@@ -670,9 +678,60 @@
   else refreshUsers();
 }
 
+  function ownerLabel(n) {
+    if (n && n.ownerUsername) return `${n.ownerUsername} · user`;
+    if (n && n.ownerType === "guest") return "游客 · guest";
+    return (n && n.ownerId) ? String(n.ownerId) : "unknown";
+  }
+
+  function rebuildAdminNotesOwners() {
+    if (!adminNotesOwner) return;
+    const prev = (adminNotesOwner.value || "").trim();
+    const map = new Map();
+    for (const n of (adminNotes || [])) {
+      const id = String(n.ownerId || "").trim();
+      if (!id) continue;
+      map.set(id, ownerLabel(n));
+    }
+    // clear + rebuild
+    adminNotesOwner.innerHTML = "";
+    const optAll = document.createElement("option");
+    optAll.value = "";
+    optAll.textContent = "所有创建者";
+    adminNotesOwner.appendChild(optAll);
+
+    const items = Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "zh"));
+    for (const [id, label] of items) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = label;
+      adminNotesOwner.appendChild(opt);
+    }
+    if (prev && map.has(prev)) adminNotesOwner.value = prev;
+    else adminNotesOwner.value = "";
+  }
+
+  function openAdminNoteView(n) {
+    if (!adminNoteViewModal) return;
+    adminNoteViewTitle.textContent = n.title || "(无标题)";
+    const meta = `创建者：${ownerLabel(n)} · 创建：${formatTime(n.createdAt || "")} · 更新：${formatTime(n.updatedAt || "")}`;
+    adminNoteViewMeta.textContent = meta;
+    adminNoteViewBody.textContent = n.body || "";
+    adminNoteViewMask.classList.remove("hidden");
+    adminNoteViewModal.classList.remove("hidden");
+  }
+
+  function closeAdminNoteView() {
+    if (!adminNoteViewModal) return;
+    adminNoteViewMask.classList.add("hidden");
+    adminNoteViewModal.classList.add("hidden");
+  }
+
   function renderAdminNotes() {
     const q = (adminNotesSearch.value || "").trim().toLowerCase();
+    const ownerSel = (adminNotesOwner && adminNotesOwner.value) ? adminNotesOwner.value.trim() : "";
     const list = (adminNotes || []).filter((n) => {
+      if (ownerSel && String(n.ownerId || "") !== ownerSel) return false;
       if (!q) return true;
       const hay = `${n.title || ""} ${n.body || ""} ${n.ownerUsername || ""} ${n.ownerId || ""}`.toLowerCase();
       return hay.includes(q);
@@ -683,27 +742,56 @@
     if (list.length === 0) return;
 
     for (const n of list) {
-      const div = document.createElement("div");
-      div.className = "item";
-      const owner = n.ownerUsername ? `${n.ownerUsername} · user` : (n.ownerType === "guest" ? "游客 · guest" : (n.ownerId || "unknown"));
-      div.innerHTML = `
-        <div class="itemMain">
-          <div class="itemTitle">${escapeHtml(n.title || "(无标题)")}</div>
-          <div class="itemBody">${escapeHtml((n.body || "").slice(0, 120))}</div>
-          <div class="itemMeta">创建者：${escapeHtml(owner)} · 更新：${escapeHtml(formatTime(n.updatedAt || ""))}</div>
-        </div>
-      `;
-      adminNotesList.appendChild(div);
+      const row = document.createElement("div");
+      row.className = "userRow";
+
+      const main = document.createElement("div");
+      main.className = "adminNoteMain";
+
+      const title = document.createElement("div");
+      title.className = "adminNoteTitle";
+      title.textContent = n.title || "(无标题)";
+
+      const snippet = document.createElement("div");
+      snippet.className = "adminNoteSnippet";
+      snippet.textContent = (n.body || "").slice(0, 120);
+
+      const meta = document.createElement("div");
+      meta.className = "smallmuted";
+      meta.textContent = `创建者：${ownerLabel(n)} · 更新：${formatTime(n.updatedAt || "")}`;
+
+      main.appendChild(title);
+      main.appendChild(snippet);
+      main.appendChild(meta);
+
+      const spacer = document.createElement("div");
+      spacer.className = "spacer";
+
+      const btn = document.createElement("button");
+      btn.className = "btn small";
+      btn.type = "button";
+      btn.textContent = "查看全文";
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        openAdminNoteView(n);
+      });
+
+      row.appendChild(main);
+      row.appendChild(spacer);
+      row.appendChild(btn);
+      adminNotesList.appendChild(row);
     }
   }
 
-  async function refreshAdminNotes() {
+
+async function refreshAdminNotes() {
     adminNotesMsg.textContent = "加载中…";
     try {
       const data = await api("/api/admin/notes", { method: "GET" });
       adminNotes = data.notes || data || [];
       adminNotesLoaded = true;
       adminNotesMsg.textContent = "";
+      rebuildAdminNotesOwners();
       renderAdminNotes();
     } catch (e) {
       adminNotesMsg.textContent = "加载失败：" + (e.message || e);
@@ -781,12 +869,20 @@
   $("btnAdminCancel").addEventListener("click", closeAdmin);
   adminMask.addEventListener("click", closeAdmin);
   $("btnCreateUser").addEventListener("click", createUser);
+  // admin notes events
+  btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
+  adminNotesSearch.addEventListener("input", renderAdminNotes);
+  adminNotesOwner && adminNotesOwner.addEventListener("change", renderAdminNotes);
+  btnAdminNoteViewClose && btnAdminNoteViewClose.addEventListener("click", closeAdminNoteView);
+  btnAdminNoteViewX && btnAdminNoteViewX.addEventListener("click", closeAdminNoteView);
+  adminNoteViewMask && adminNoteViewMask.addEventListener("click", closeAdminNoteView);
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (!modalEl.classList.contains("hidden")) closeMemoModal();
       if (!loginModal.classList.contains("hidden")) closeLogin();
-      if (!adminModal.classList.contains("hidden")) closeAdmin();
+      if (!adminNoteViewModal.classList.contains("hidden")) closeAdminNoteView();
+       if (!adminModal.classList.contains("hidden")) closeAdmin();
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
