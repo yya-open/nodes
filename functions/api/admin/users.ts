@@ -14,20 +14,39 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const deny = requireRole(p, "admin");
   if (deny) return deny;
 
+  const url = new URL(ctx.request.url);
+  const limitRaw = Number(url.searchParams.get("limit") || "50");
+  const offsetRaw = Number(url.searchParams.get("offset") || "0");
+
+  const limit = Math.max(1, Math.min(1000, Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 50));
+  const offset = Math.max(0, Number.isFinite(offsetRaw) ? Math.floor(offsetRaw) : 0);
+
+  const totalRow = await dbOne<any>(ctx.env.DB, "SELECT COUNT(*) as c FROM users");
+  const total = Number(totalRow?.c || 0);
+
   const items = await dbAll<any>(
     ctx.env.DB,
-    "SELECT id, username, role, created_at, updated_at FROM users ORDER BY created_at DESC LIMIT 500"
+    "SELECT id, username, role, created_at, updated_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?",
+    [limit, offset]
   );
+
   return json({
-    items: items.map(u => ({
+    items: items.map((u) => ({
       id: String(u.id),
       username: String(u.username),
       role: String(u.role),
       createdAt: String(u.created_at),
       updatedAt: String(u.updated_at),
     })),
+    page: {
+      limit,
+      offset,
+      total,
+      hasMore: offset + items.length < total,
+    },
   });
 };
+
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const p = await getPrincipal(ctx);

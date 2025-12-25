@@ -47,8 +47,21 @@
   let editingId = null;
 
   let adminNotes = [];
-  let adminNotesLoaded = false;
+let adminNotesLoaded = false;
 
+// ---- admin pagination state
+let adminUsersOffset = 0;
+const adminUsersLimit = 50;
+let adminUsersTotal = null;
+let adminUsersHasMore = false;
+
+let adminNotesOffset = 0;
+const adminNotesLimit = 50;
+let adminNotesTotal = null;
+let adminNotesHasMore = false;
+let adminNotesLastQuery = "";
+let adminNotesOwnersLoaded = false;
+let adminNotesDebounce = null;
   // ---- message UI
   function setStatus(el, text = "", kind = "") {
     if (!el) return;
@@ -144,6 +157,10 @@
   const adminNotesList = $("adminNotesList");
   const adminNotesEmpty = $("adminNotesEmpty");
   const adminNotesMsg = $("adminNotesMsg");
+  const btnUsersMore = $("btnUsersMore");
+  const usersMoreMsg = $("usersMoreMsg");
+  const btnAdminNotesMore = $("btnAdminNotesMore");
+  const adminNotesMoreMsg = $("adminNotesMoreMsg");
   const usersList = $("usersList");
   const usersEmpty = $("usersEmpty");
   const adminMsg = $("adminMsg");
@@ -569,7 +586,8 @@
   // ✅ 默认进入用户 Tab（或者你想默认 notes 也行）
   setAdminTab("users");
   // ✅ 关键：立刻拉取用户列表
-  refreshUsers();
+  adminNotesOwnersLoaded = false;
+  refreshUsers(true);
 }
   function bindAdminTabs() {
   const tabUsers = document.getElementById("adminTabUsers");
@@ -600,55 +618,125 @@
     adminModal.classList.add("hidden");
   }
 
-  async function refreshUsers() {
-    try {
-      const data = await api("/api/admin/users", { method: "GET" });
-      const users = data.items || [];
+  async function refreshUsers(reset = true) {
+  try {
+    if (reset) {
+      adminUsersOffset = 0;
+      adminUsersTotal = null;
+      adminUsersHasMore = false;
       usersList.innerHTML = "";
-      usersEmpty.classList.toggle("hidden", users.length !== 0);
+      if (usersMoreMsg) usersMoreMsg.textContent = "";
+      if (btnUsersMore) {
+        btnUsersMore.classList.add("hidden");
+        btnUsersMore.disabled = true;
+        btnUsersMore.textContent = "加载更多";
+      }
+    } else {
+      if (btnUsersMore) {
+        btnUsersMore.disabled = true;
+        btnUsersMore.textContent = "加载中…";
+      }
+    }
 
-      for (const u of users) {
-        const row = document.createElement("div");
-        row.className = "userRow";
+    const data = await api(`/api/admin/users?limit=${adminUsersLimit}&offset=${adminUsersOffset}`, { method: "GET" });
+    const users = data.items || [];
+    const page = data.page || {};
 
-        const name = document.createElement("div");
-        name.className = "u";
-        name.textContent = u.username;
+    usersEmpty.classList.toggle("hidden", (adminUsersOffset + users.length) !== 0);
 
-        const pill = document.createElement("div");
-        pill.className = "pill";
-        pill.textContent = u.role;
+    for (const u of users) {
+      const row = document.createElement("div");
+      row.className = "userRow";
 
-        const created = document.createElement("div");
-        created.className = "smallmuted";
-        created.textContent = `创建：${formatTime(u.createdAt)}  更新：${formatTime(u.updatedAt)}`;
+      const name = document.createElement("div");
+      name.className = "u";
+      name.textContent = u.username;
 
-        const roleSel = document.createElement("select");
-        roleSel.className = "select";
-        roleSel.innerHTML = `<option value="user">普通用户</option><option value="admin">管理员</option>`;
-        roleSel.value = u.role;
+      const pill = document.createElement("div");
+      pill.className = "pill";
+      pill.textContent = u.role;
 
-        const passInput = document.createElement("input");
-        passInput.className = "input";
-        passInput.placeholder = "重置口令（可选）";
+      const created = document.createElement("div");
+      created.className = "smallmuted";
+      created.textContent = `创建：${formatTime(u.createdAt)}  更新：${formatTime(u.updatedAt)}`;
 
-        const btnSave = document.createElement("button");
-        btnSave.className = "btn primary";
-        btnSave.textContent = "保存";
-        btnSave.addEventListener("click", async () => {
-          try {
-            await api(`/api/admin/users/${encodeURIComponent(u.id)}`, {
-              method: "PATCH",
-              body: JSON.stringify({
-                role: roleSel.value,
-                passcode: (passInput.value || "").trim() || undefined,
-              }),
-            });
-            adminMsg.textContent = "已保存。";
-            await refreshUsers();
-          } catch (e) {
-            adminMsg.textContent = `保存失败：${e.message || e}`;
-          }
+      const roleSel = document.createElement("select");
+      roleSel.className = "select";
+      roleSel.innerHTML = `<option value="user">普通用户</option><option value="admin">管理员</option>`;
+      roleSel.value = u.role;
+
+      const passInput = document.createElement("input");
+      passInput.className = "input";
+      passInput.placeholder = "重置口令（可选）";
+
+      const btnSave = document.createElement("button");
+      btnSave.className = "btn primary";
+      btnSave.textContent = "保存";
+      btnSave.addEventListener("click", async () => {
+        try {
+          await api(`/api/admin/users/${encodeURIComponent(u.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              role: roleSel.value,
+              passcode: (passInput.value || "").trim() || undefined,
+            }),
+          });
+          adminMsg.textContent = "已保存。";
+          await refreshUsers(true);
+        } catch (e) {
+          adminMsg.textContent = `保存失败：${e.message || e}`;
+        }
+      });
+
+      const btnDel = document.createElement("button");
+      btnDel.className = "btn danger";
+      btnDel.textContent = "删除";
+      btnDel.addEventListener("click", async () => {
+        const ok = confirm(`确定删除用户 ${u.username} 吗？`);
+        if (!ok) return;
+        try {
+          await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "DELETE" });
+          adminMsg.textContent = "已删除。";
+          await refreshUsers(true);
+        } catch (e) {
+          adminMsg.textContent = `删除失败：${e.message || e}`;
+        }
+      });
+
+      row.appendChild(name);
+      row.appendChild(pill);
+      row.appendChild(created);
+      row.appendChild(roleSel);
+      row.appendChild(passInput);
+      row.appendChild(btnSave);
+      row.appendChild(btnDel);
+
+      usersList.appendChild(row);
+    }
+
+    adminUsersOffset += users.length;
+
+    if (typeof page.total === "number") adminUsersTotal = page.total;
+    if (typeof page.hasMore === "boolean") adminUsersHasMore = page.hasMore;
+    else adminUsersHasMore = users.length === adminUsersLimit;
+
+    if (btnUsersMore) {
+      btnUsersMore.classList.toggle("hidden", !adminUsersHasMore);
+      btnUsersMore.disabled = !adminUsersHasMore;
+      btnUsersMore.textContent = "加载更多";
+    }
+
+    if (usersMoreMsg) {
+      usersMoreMsg.textContent = adminUsersTotal != null ? `已加载 ${adminUsersOffset}/${adminUsersTotal}` : `已加载 ${adminUsersOffset}`;
+    }
+  } catch (e) {
+    adminMsg.textContent = `加载用户失败：${e.message || e}`;
+    if (btnUsersMore) {
+      btnUsersMore.disabled = false;
+      btnUsersMore.textContent = "加载更多";
+    }
+  }
+}
         });
 
         const btnDel = document.createElement("button");
@@ -706,15 +794,38 @@
     return (n && n.ownerId) ? String(n.ownerId) : "unknown";
   }
 
-  function rebuildAdminNotesOwners() {
-    if (!adminNotesOwner) return;
-    const prev = (adminNotesOwner.value || "").trim();
-    const map = new Map();
-    for (const n of (adminNotes || [])) {
-      const id = String(n.ownerId || "").trim();
-      if (!id) continue;
-      map.set(id, ownerLabel(n));
+  async function rebuildAdminNotesOwners() {
+  // 现在改为从用户列表构建 owner 下拉（避免 notes 分页后 owner 不完整）
+  if (!adminNotesOwner) return;
+
+  const prev = (adminNotesOwner.value || "").trim();
+  adminNotesOwner.innerHTML = "";
+
+  const optAll = document.createElement("option");
+  optAll.value = "";
+  optAll.textContent = "所有创建者";
+  adminNotesOwner.appendChild(optAll);
+
+  try {
+    const data = await api(`/api/admin/users?limit=1000&offset=0`, { method: "GET" });
+    const users = data.items || [];
+    const items = users
+      .map((u) => [String(u.id || ""), String(u.username || String(u.id || ""))])
+      .filter(([id]) => !!id)
+      .sort((a, b) => a[1].localeCompare(b[1], "zh"));
+
+    for (const [id, label] of items) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = label;
+      adminNotesOwner.appendChild(opt);
     }
+  } catch {
+    // ignore; owner 下拉至少有“所有创建者”
+  }
+
+  if (prev) adminNotesOwner.value = prev;
+}
     // clear + rebuild
     adminNotesOwner.innerHTML = "";
     const optAll = document.createElement("option");
@@ -750,74 +861,127 @@
   }
 
   function renderAdminNotes() {
-    const q = (adminNotesSearch.value || "").trim().toLowerCase();
-    const ownerSel = (adminNotesOwner && adminNotesOwner.value) ? adminNotesOwner.value.trim() : "";
-    const list = (adminNotes || []).filter((n) => {
-      if (ownerSel && String(n.ownerId || "") !== ownerSel) return false;
-      if (!q) return true;
-      const hay = `${n.title || ""} ${n.body || ""} ${n.ownerUsername || ""} ${n.ownerId || ""}`.toLowerCase();
-      return hay.includes(q);
+  const list = adminNotes || [];
+
+  adminNotesList.innerHTML = "";
+  adminNotesEmpty.classList.toggle("hidden", list.length !== 0);
+  if (list.length === 0) return;
+
+  for (const n of list) {
+    const row = document.createElement("div");
+    row.className = "userRow";
+
+    const main = document.createElement("div");
+    main.className = "adminNoteMain";
+
+    const title = document.createElement("div");
+    title.className = "adminNoteTitle";
+    title.textContent = n.title || "(无标题)";
+
+    const snippet = document.createElement("div");
+    snippet.className = "adminNoteSnippet";
+    snippet.textContent = (n.body || "").slice(0, 120);
+
+    const meta = document.createElement("div");
+    meta.className = "smallmuted";
+    meta.textContent = `创建者：${ownerLabel(n)} · 更新：${formatTime(n.updatedAt || "")}`;
+
+    main.appendChild(title);
+    main.appendChild(snippet);
+    main.appendChild(meta);
+
+    const spacer = document.createElement("div");
+    spacer.className = "spacer";
+
+    const btn = document.createElement("button");
+    btn.className = "btn small";
+    btn.type = "button";
+    btn.textContent = "查看全文";
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openAdminNoteView(n);
     });
 
-    adminNotesList.innerHTML = "";
-    adminNotesEmpty.classList.toggle("hidden", list.length !== 0);
-    if (list.length === 0) return;
-
-    for (const n of list) {
-      const row = document.createElement("div");
-      row.className = "userRow";
-
-      const main = document.createElement("div");
-      main.className = "adminNoteMain";
-
-      const title = document.createElement("div");
-      title.className = "adminNoteTitle";
-      title.textContent = n.title || "(无标题)";
-
-      const snippet = document.createElement("div");
-      snippet.className = "adminNoteSnippet";
-      snippet.textContent = (n.body || "").slice(0, 120);
-
-      const meta = document.createElement("div");
-      meta.className = "smallmuted";
-      meta.textContent = `创建者：${ownerLabel(n)} · 更新：${formatTime(n.updatedAt || "")}`;
-
-      main.appendChild(title);
-      main.appendChild(snippet);
-      main.appendChild(meta);
-
-      const spacer = document.createElement("div");
-      spacer.className = "spacer";
-
-      const btn = document.createElement("button");
-      btn.className = "btn small";
-      btn.type = "button";
-      btn.textContent = "查看全文";
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        openAdminNoteView(n);
-      });
-
-      row.appendChild(main);
-      row.appendChild(spacer);
-      row.appendChild(btn);
-      adminNotesList.appendChild(row);
-    }
+    row.appendChild(main);
+    row.appendChild(spacer);
+    row.appendChild(btn);
+    adminNotesList.appendChild(row);
+  }
+}
   }
 
 
-async function refreshAdminNotes() {
-    adminNotesMsg.textContent = "加载中…";
-    try {
-      const data = await api("/api/admin/notes", { method: "GET" });
-      adminNotes = data.notes || data || [];
-      adminNotesLoaded = true;
-      adminNotesMsg.textContent = "";
-      rebuildAdminNotesOwners();
-      renderAdminNotes();
-    } catch (e) {
-      adminNotesMsg.textContent = "加载失败：" + (e.message || e);
+async function refreshAdminNotes(reset = true) {
+  const q = (adminNotesSearch?.value || "").trim();
+  const ownerId = (adminNotesOwner?.value || "").trim();
+  const queryKey = `${q}||${ownerId}`;
+
+  if (reset || queryKey !== adminNotesLastQuery) {
+    adminNotesLastQuery = queryKey;
+    adminNotesOffset = 0;
+    adminNotesTotal = null;
+    adminNotesHasMore = false;
+    adminNotes = [];
+    adminNotesList.innerHTML = "";
+    adminNotesEmpty.classList.add("hidden");
+    if (adminNotesMoreMsg) adminNotesMoreMsg.textContent = "";
+    if (btnAdminNotesMore) {
+      btnAdminNotesMore.classList.add("hidden");
+      btnAdminNotesMore.disabled = true;
+      btnAdminNotesMore.textContent = "加载更多";
     }
+  } else {
+    if (btnAdminNotesMore) {
+      btnAdminNotesMore.disabled = true;
+      btnAdminNotesMore.textContent = "加载中…";
+    }
+  }
+
+  adminNotesMsg.textContent = "加载中…";
+  try {
+    const params = new URLSearchParams();
+    params.set("limit", String(adminNotesLimit));
+    params.set("offset", String(adminNotesOffset));
+    if (q) params.set("q", q);
+    if (ownerId) params.set("ownerId", ownerId);
+
+    const data = await api(`/api/admin/notes?${params.toString()}`, { method: "GET" });
+    const items = data.items || data.notes || [];
+    const page = data.page || {};
+
+    adminNotes = adminNotes.concat(items);
+    adminNotesLoaded = true;
+    adminNotesMsg.textContent = "";
+
+    adminNotesOffset += items.length;
+    if (typeof page.total === "number") adminNotesTotal = page.total;
+    if (typeof page.hasMore === "boolean") adminNotesHasMore = page.hasMore;
+    else adminNotesHasMore = items.length === adminNotesLimit;
+
+    // owner 下拉只需要加载一次（或首次打开管理员页）
+    if (!adminNotesOwnersLoaded) {
+      await rebuildAdminNotesOwners();
+      adminNotesOwnersLoaded = true;
+    }
+
+    renderAdminNotes();
+
+    if (btnAdminNotesMore) {
+      btnAdminNotesMore.classList.toggle("hidden", !adminNotesHasMore);
+      btnAdminNotesMore.disabled = !adminNotesHasMore;
+      btnAdminNotesMore.textContent = "加载更多";
+    }
+    if (adminNotesMoreMsg) {
+      adminNotesMoreMsg.textContent = adminNotesTotal != null ? `已加载 ${adminNotesOffset}/${adminNotesTotal}` : `已加载 ${adminNotesOffset}`;
+    }
+  } catch (e) {
+    adminNotesMsg.textContent = "加载失败：" + (e.message || e);
+    if (btnAdminNotesMore) {
+      btnAdminNotesMore.disabled = false;
+      btnAdminNotesMore.textContent = "加载更多";
+    }
+  }
+}
   }
 
   async function createUser() {
@@ -891,9 +1055,9 @@ async function refreshAdminNotes() {
       const data = await api("/api/share/create", {
         method: "POST",
         body: JSON.stringify({
-          noteId: shareForMemoId,
+          memoId: shareForMemoId,
           burnAfterRead: burn,
-          expiresInSeconds: (expireHours > 0 ? Math.round(expireHours * 3600) : 0) || 0,
+          expireHours: expireHours || 0,
         }),
       });
       // data: { url } or { token } depending on backend
@@ -974,9 +1138,15 @@ $("btnCancel").addEventListener("click", closeMemoModal);
   adminMask.addEventListener("click", closeAdmin);
   $("btnCreateUser").addEventListener("click", createUser);
   // admin notes events
-  btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
-  adminNotesSearch.addEventListener("input", renderAdminNotes);
-  adminNotesOwner && adminNotesOwner.addEventListener("change", renderAdminNotes);
+  btnAdminNotesRefresh.addEventListener("click", () => refreshAdminNotes(true));
+
+  btnUsersMore && btnUsersMore.addEventListener("click", () => refreshUsers(false));
+  btnAdminNotesMore && btnAdminNotesMore.addEventListener("click", () => refreshAdminNotes(false));
+  adminNotesSearch.addEventListener("input", () => {
+    if (adminNotesDebounce) clearTimeout(adminNotesDebounce);
+    adminNotesDebounce = setTimeout(() => refreshAdminNotes(true), 250);
+  });
+  adminNotesOwner && adminNotesOwner.addEventListener("change", () => refreshAdminNotes(true));
   btnAdminNoteViewClose && btnAdminNoteViewClose.addEventListener("click", closeAdminNoteView);
   btnAdminNoteViewX && btnAdminNoteViewX.addEventListener("click", closeAdminNoteView);
   adminNoteViewMask && adminNoteViewMask.addEventListener("click", closeAdminNoteView);
