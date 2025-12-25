@@ -11,7 +11,7 @@ type Body = {
 };
 
 export async function onRequestPost(ctx: { request: Request; env: Env }) {
-  const p = getPrincipal(ctx);
+  const p = await getPrincipal(ctx);
   const authErr = requireAuth(p);
   if (authErr) return authErr;
 
