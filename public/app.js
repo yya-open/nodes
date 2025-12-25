@@ -549,7 +549,7 @@
   $("btnCancel").addEventListener("click", closeMemoModal);
   $("btnSave").addEventListener("click", saveMemoModal);
   $("btnDelete").addEventListener("click", doDeleteMemo);
-  btnShareEl.addEventListener("click", () => openShareModal(editingId));
+  $("btnShare")?.addEventListener("click", () => openShareModal(editingId));
   maskEl.addEventListener("click", closeMemoModal);
 
   // search/filter/sort
