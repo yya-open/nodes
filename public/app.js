@@ -735,6 +735,13 @@
   adminMask.addEventListener("click", closeAdmin);
   $("btnCreateUser").addEventListener("click", createUser);
 
+  // Admin tabs / notes events
+  adminTabUsers.addEventListener("click", () => setAdminTab("users"));
+  adminTabNotes.addEventListener("click", () => setAdminTab("notes"));
+  btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
+  adminNotesSearch.addEventListener("input", () => renderAdminNotes());
+
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (!modalEl.classList.contains("hidden")) closeMemoModal();

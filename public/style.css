@@ -289,10 +289,3 @@ body{
   border:1px solid var(--line);
   color: var(--muted);
 }
-
-
-/* Admin tabs */
-.tabs{display:flex;gap:8px;padding:10px 16px 0 16px}
-.tab{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#dfe7ff;cursor:pointer}
-.tab.active{background:rgba(120,140,255,.22);border-color:rgba(120,140,255,.35)}
-.itemMeta{margin-top:6px;font-size:12px;opacity:.75}
