@@ -24,6 +24,16 @@
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     } catch { return iso; }
   };
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<"'>]/g, (c) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[c]));
+  }
   const parseTags = (s) =>
     (s || "")
       .split(",")
@@ -35,6 +45,9 @@
   let me = { authenticated: false, role: "none" };
   let memos = [];
   let editingId = null;
+
+  let adminNotes = [];
+  let adminNotesLoaded = false;
 
   // ---- dom
   const $ = (id) => document.getElementById(id);
@@ -50,6 +63,7 @@
   const btnSwitch = $("btnSwitch");
   const btnLogout = $("btnLogout");
   const btnAdmin = $("btnAdmin");
+  const btnGuestTools = $("btnGuestTools");
 
   // memo modal
   const maskEl = $("modalMask");
@@ -64,6 +78,19 @@
 
   // login modal
   const loginMask = $("loginMask");
+  const guestToolsMask = $("guestToolsMask");
+  const guestToolsModal = $("guestToolsModal");
+  const btnGuestToolsClose = $("btnGuestToolsClose");
+  const btnGuestToolsCancel = $("btnGuestToolsCancel");
+  const btnGenRecover = $("btnGenRecover");
+  const btnCopyRecover = $("btnCopyRecover");
+  const recoverCodeOut = $("recoverCodeOut");
+  const recoverCodeIn = $("recoverCodeIn");
+  const btnUseRecover = $("btnUseRecover");
+  const upgradeUsername = $("upgradeUsername");
+  const upgradePasscode = $("upgradePasscode");
+  const btnGuestUpgrade = $("btnGuestUpgrade");
+  const guestToolsMsg = $("guestToolsMsg");
   const loginModal = $("loginModal");
   const loginUser = $("loginUser");
   const loginPass = $("loginPass");
@@ -72,19 +99,18 @@
   // admin modal
   const adminMask = $("adminMask");
   const adminModal = $("adminModal");
+  const adminTabUsers = $("adminTabUsers");
+  const adminTabNotes = $("adminTabNotes");
+  const adminPanelUsers = $("adminPanelUsers");
+  const adminPanelNotes = $("adminPanelNotes");
+  const adminNotesSearch = $("adminNotesSearch");
+  const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
+  const adminNotesList = $("adminNotesList");
+  const adminNotesEmpty = $("adminNotesEmpty");
+  const adminNotesMsg = $("adminNotesMsg");
   const usersList = $("usersList");
   const usersEmpty = $("usersEmpty");
   const adminMsg = $("adminMsg");
-
-const tabAdminUsers = $("tabAdminUsers");
-const tabAdminNotes = $("tabAdminNotes");
-const adminUsersPanel = $("adminUsersPanel");
-const adminNotesPanel = $("adminNotesPanel");
-const adminNotesList = $("adminNotesList");
-const adminNotesEmpty = $("adminNotesEmpty");
-const adminNotesMsg = $("adminNotesMsg");
-const adminNotesQuery = $("adminNotesQuery");
-const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
   const newUsername = $("newUsername");
   const newPasscode = $("newPasscode");
   const newRole = $("newRole");
@@ -98,6 +124,7 @@ const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
     }
     renderWho();
     btnAdmin.classList.toggle("hidden", me.role !== "admin");
+    btnGuestTools.classList.toggle("hidden", me.role !== "guest");
     btnLogout.classList.toggle("hidden", !me.authenticated);
   }
 
@@ -121,6 +148,64 @@ const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
   function closeLogin() {
     loginMask.classList.add("hidden");
     loginModal.classList.add("hidden");
+  }
+
+
+  function openGuestTools() {
+    guestToolsMsg.textContent = "";
+    recoverCodeOut.value = "";
+    recoverCodeIn.value = "";
+    upgradeUsername.value = "";
+    upgradePasscode.value = "";
+    guestToolsMask.classList.remove("hidden");
+    guestToolsModal.classList.remove("hidden");
+  }
+  function closeGuestTools() {
+    guestToolsMask.classList.add("hidden");
+    guestToolsModal.classList.add("hidden");
+  }
+
+  async function genRecoverCode() {
+    guestToolsMsg.textContent = "正在生成恢复码…";
+    try {
+      const data = await api("/api/auth/guest/code", { method: "POST", body: "{}" });
+      const code = data.code || data.recoveryCode || data.token || "";
+      recoverCodeOut.value = code;
+      guestToolsMsg.textContent = code ? "已生成恢复码（建议尽快使用）。" : "生成成功，但未返回 code。";
+    } catch (e) {
+      guestToolsMsg.textContent = "生成失败：" + (e.message || e);
+    }
+  }
+
+  async function useRecoverCode() {
+    const code = (recoverCodeIn.value || "").trim();
+    if (!code) return (guestToolsMsg.textContent = "请先输入恢复码。");
+    guestToolsMsg.textContent = "正在恢复…";
+    try {
+      await api("/api/auth/guest/recover", { method: "POST", body: JSON.stringify({ code }) });
+      guestToolsMsg.textContent = "恢复成功，正在刷新…";
+      await refreshMe();
+      await loadMemos();
+      closeGuestTools();
+    } catch (e) {
+      guestToolsMsg.textContent = "恢复失败：" + (e.message || e);
+    }
+  }
+
+  async function guestUpgrade() {
+    const username = (upgradeUsername.value || "").trim();
+    const passcode = (upgradePasscode.value || "").trim();
+    if (!username) return (guestToolsMsg.textContent = "请输入新用户名。");
+    if (passcode.length < 6) return (guestToolsMsg.textContent = "口令至少 6 位。");
+    guestToolsMsg.textContent = "正在转正并迁移…";
+    try {
+      await api("/api/auth/guest/upgrade", { method: "POST", body: JSON.stringify({ username, passcode }) });
+      await refreshMe();
+      await loadMemos();
+      closeGuestTools();
+    } catch (e) {
+      guestToolsMsg.textContent = "转正失败：" + (e.message || e);
+    }
   }
 
   async function loginAsGuest() {
@@ -438,7 +523,9 @@ const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
     adminMsg.textContent = "";
     adminMask.classList.remove("hidden");
     adminModal.classList.remove("hidden");
+    adminNotesLoaded = false;
     setAdminTab("users");
+    refreshUsers();
   }
   function closeAdmin() {
     adminMask.classList.add("hidden");
@@ -527,84 +614,54 @@ const btnAdminNotesRefresh = $("btnAdminNotesRefresh");
   }
 
 
-function setAdminTab(tab) {
-  if (tab === "notes") {
-    tabAdminNotes.classList.add("active");
-    tabAdminUsers.classList.remove("active");
-    adminNotesPanel.classList.remove("hidden");
-    adminUsersPanel.classList.add("hidden");
-    refreshAdminNotes();
-  } else {
-    tabAdminUsers.classList.add("active");
-    tabAdminNotes.classList.remove("active");
-    adminUsersPanel.classList.remove("hidden");
-    adminNotesPanel.classList.add("hidden");
-    refreshUsers();
+  function setAdminTab(tab) {
+    const isUsers = tab === "users";
+    adminTabUsers.classList.toggle("active", isUsers);
+    adminTabNotes.classList.toggle("active", !isUsers);
+    adminPanelUsers.classList.toggle("hidden", !isUsers);
+    adminPanelNotes.classList.toggle("hidden", isUsers);
+    if (!isUsers && !adminNotesLoaded) refreshAdminNotes();
   }
-}
 
-function shortId(id) {
-  if (!id) return "";
-  return id.length <= 14 ? id : id.slice(0, 6) + "…" + id.slice(-6);
-}
-
-async function refreshAdminNotes() {
-  adminNotesMsg.textContent = "";
-  adminNotesList.innerHTML = "";
-  adminNotesEmpty.classList.add("hidden");
-  try {
-    const res = await api("/api/admin/notes");
-    const q = (adminNotesQuery.value || "").trim().toLowerCase();
-    const items = (res.items || []).filter((it) => {
+  function renderAdminNotes() {
+    const q = (adminNotesSearch.value || "").trim().toLowerCase();
+    const list = (adminNotes || []).filter((n) => {
       if (!q) return true;
-      const hay = [it.title || "", it.body || "", it.ownerUsername || "", it.ownerId || ""].join("\n").toLowerCase();
+      const hay = `${n.title || ""} ${n.body || ""} ${n.ownerUsername || ""} ${n.ownerId || ""}`.toLowerCase();
       return hay.includes(q);
     });
 
-    if (!items.length) {
-      adminNotesEmpty.classList.remove("hidden");
-      return;
+    adminNotesList.innerHTML = "";
+    adminNotesEmpty.classList.toggle("hidden", list.length !== 0);
+    if (list.length === 0) return;
+
+    for (const n of list) {
+      const div = document.createElement("div");
+      div.className = "item";
+      const owner = n.ownerUsername ? `${n.ownerUsername} · user` : (n.ownerType === "guest" ? "游客 · guest" : (n.ownerId || "unknown"));
+      div.innerHTML = `
+        <div class="itemMain">
+          <div class="itemTitle">${escapeHtml(n.title || "(无标题)")}</div>
+          <div class="itemBody">${escapeHtml((n.body || "").slice(0, 120))}</div>
+          <div class="itemMeta">创建者：${escapeHtml(owner)} · 更新：${escapeHtml(formatTime(n.updatedAt || ""))}</div>
+        </div>
+      `;
+      adminNotesList.appendChild(div);
     }
-
-    for (const n of items) {
-      const wrap = document.createElement("div");
-      wrap.className = "noteAdminItem";
-
-      const top = document.createElement("div");
-      top.className = "noteAdminTop";
-
-      const title = document.createElement("div");
-      title.className = "noteAdminTitle";
-      title.textContent = n.title || "(无标题)";
-
-      const owner = document.createElement("span");
-      const creatorLabel = n.ownerType === "user"
-        ? (n.ownerUsername ? `用户：${n.ownerUsername}` : `用户：${shortId(n.ownerId)}`)
-        : `游客：${shortId(n.ownerId)}`;
-      owner.className = "badge " + (n.ownerType === "user" ? "user" : "guest");
-      owner.textContent = creatorLabel;
-
-      const updated = document.createElement("span");
-      updated.className = "badge";
-      updated.textContent = `更新：${formatTime(n.updatedAt)}`;
-
-      top.appendChild(title);
-      top.appendChild(owner);
-      top.appendChild(updated);
-
-      const preview = document.createElement("div");
-      preview.className = "smallmuted";
-      const text = (n.body || "").replace(/\s+/g, " ").trim();
-      preview.textContent = text ? (text.length > 160 ? text.slice(0, 160) + "…" : text) : "（无内容）";
-
-      wrap.appendChild(top);
-      wrap.appendChild(preview);
-      adminNotesList.appendChild(wrap);
-    }
-  } catch (e) {
-    adminNotesMsg.textContent = `加载失败：${e.message || e}`;
   }
-}
+
+  async function refreshAdminNotes() {
+    adminNotesMsg.textContent = "加载中…";
+    try {
+      const data = await api("/api/admin/notes", { method: "GET" });
+      adminNotes = data.notes || data || [];
+      adminNotesLoaded = true;
+      adminNotesMsg.textContent = "";
+      renderAdminNotes();
+    } catch (e) {
+      adminNotesMsg.textContent = "加载失败：" + (e.message || e);
+    }
+  }
 
   async function createUser() {
     const u = (newUsername.value || "").trim();
@@ -658,13 +715,21 @@ async function refreshAdminNotes() {
 
   // admin modal events
   btnAdmin.addEventListener("click", openAdmin);
-
-tabAdminUsers.addEventListener("click", () => setAdminTab("users"));
-tabAdminNotes.addEventListener("click", () => setAdminTab("notes"));
-btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
-adminNotesQuery.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") refreshAdminNotes();
-});
+  btnGuestTools.addEventListener("click", openGuestTools);
+  btnGuestToolsClose.addEventListener("click", closeGuestTools);
+  btnGuestToolsCancel.addEventListener("click", closeGuestTools);
+  guestToolsMask.addEventListener("click", closeGuestTools);
+  btnGenRecover.addEventListener("click", genRecoverCode);
+  btnCopyRecover.addEventListener("click", async () => {
+    try {
+      if (recoverCodeOut.value) await navigator.clipboard.writeText(recoverCodeOut.value);
+      guestToolsMsg.textContent = recoverCodeOut.value ? "已复制" : "没有可复制的恢复码";
+    } catch {
+      guestToolsMsg.textContent = "复制失败，请手动复制。";
+    }
+  });
+  btnUseRecover.addEventListener("click", useRecoverCode);
+  btnGuestUpgrade.addEventListener("click", guestUpgrade);
   $("btnAdminClose").addEventListener("click", closeAdmin);
   $("btnAdminCancel").addEventListener("click", closeAdmin);
   adminMask.addEventListener("click", closeAdmin);

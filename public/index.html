@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>备忘录系统（云同步版）</title>
+  <title>备忘录系统</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -11,8 +11,8 @@
     <div class="brand">
       <div class="logo">📝</div>
       <div>
-        <div class="title">备忘录系统（云同步）</div>
-        <div class="subtitle">Cloudflare Pages + D1 · 游客/用户/管理员</div>
+        <div class="title">备忘录系统</div>
+        <div class="subtitle">Cloudflare Pages </div>
       </div>
     </div>
 
@@ -46,6 +46,7 @@
           <option value="created_asc">按创建时间（旧→新）</option>
         </select>
 
+        <button id="btnGuestTools" class="btn hidden">游客工具</button>
         <button id="btnAdmin" class="btn hidden">用户管理</button>
       </div>
 
@@ -151,15 +152,15 @@
       <div class="modalTitle">用户管理（管理员）</div>
       <button id="btnAdminClose" class="iconBtn" aria-label="关闭">✕</button>
     </div>
+    <div class="tabs">
+      <button id="adminTabUsers" class="tab active">用户</button>
+      <button id="adminTabNotes" class="tab">备忘录</button>
+    </div>
+
     <div class="modalBody">
+      <div id="adminPanelUsers">
 
-<div class="tabs">
-  <button id="tabAdminUsers" class="tab active" type="button">用户</button>
-  <button id="tabAdminNotes" class="tab" type="button">备忘录</button>
-</div>
-
-<div id="adminUsersPanel">
-<div class="row">
+      <div class="row">
         <input id="newUsername" class="input" placeholder="新用户名（唯一）" />
         <input id="newPasscode" class="input" placeholder="口令（至少6位）" />
         <select id="newRole" class="select">
@@ -174,25 +175,79 @@
       <div id="usersList" class="users"></div>
       <div id="usersEmpty" class="smallmuted hidden">暂无用户。</div>
       <div id="adminMsg" class="smallmuted"></div>
-</div>
+    
+      </div>
 
-<div id="adminNotesPanel" class="hidden">
-  <div class="row">
-    <input id="adminNotesQuery" class="input" placeholder="搜索（标题/内容/创建者）" />
-    <button id="btnAdminNotesRefresh" class="btn">刷新</button>
-  </div>
-  <div class="divider"></div>
-  <div id="adminNotesList" class="notesAdmin"></div>
-  <div id="adminNotesEmpty" class="smallmuted hidden">暂无备忘录。</div>
-  <div id="adminNotesMsg" class="smallmuted"></div>
+
+      <div id="adminPanelNotes" class="hidden">
+        <div class="row">
+          <input id="adminNotesSearch" class="input" placeholder="搜索标题/内容/创建者…" />
+          <button id="btnAdminNotesRefresh" class="btn">刷新</button>
+        </div>
+        <div id="adminNotesList" class="list"></div>
+        <div id="adminNotesEmpty" class="smallmuted hidden">暂无备忘录。</div>
+        <div id="adminNotesMsg" class="smallmuted"></div>
+      </div>
+
 </div>
-    </div>
     <div class="modalFooter">
       <div class="smallmuted">提示：重置口令会立即生效（旧 token 仍可能在过期前有效）。</div>
       <div class="spacer"></div>
       <button id="btnAdminCancel" class="btn">关闭</button>
     </div>
   </div>
+
+
+  <!-- Guest Tools Modal -->
+  <div id="guestToolsMask" class="mask hidden"></div>
+  <div id="guestToolsModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modalHeader">
+      <div class="modalTitle">游客工具</div>
+      <button id="btnGuestToolsClose" class="iconBtn" aria-label="关闭">✕</button>
+    </div>
+    <div class="modalBody">
+      <div class="hint">
+        <div class="hintTitle">生成恢复码</div>
+        <div class="hintText">用于在新设备恢复当前游客数据（短时有效）。</div>
+        <div class="row">
+          <button id="btnGenRecover" class="btn">生成恢复码</button>
+          <input id="recoverCodeOut" class="input" placeholder="生成后显示在这里" readonly />
+          <button id="btnCopyRecover" class="btn">复制</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="hint">
+        <div class="hintTitle">在新设备使用恢复码</div>
+        <div class="hintText">先以游客身份进入，再输入恢复码即可切换到原游客。</div>
+        <div class="row">
+          <input id="recoverCodeIn" class="input" placeholder="输入恢复码，例如 G-xxxx" />
+          <button id="btnUseRecover" class="btn primary">使用恢复码</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="hint">
+        <div class="hintTitle">游客转正</div>
+        <div class="hintText">创建账号并迁移当前游客的所有备忘录到该账号。</div>
+        <div class="row">
+          <input id="upgradeUsername" class="input" placeholder="新用户名（唯一）" />
+          <input id="upgradePasscode" class="input" type="password" placeholder="新口令（至少6位）" />
+          <button id="btnGuestUpgrade" class="btn primary">转为账号</button>
+        </div>
+      </div>
+
+      <div id="guestToolsMsg" class="smallmuted"></div>
+    </div>
+    <div class="modalFooter">
+      <div class="smallmuted">提示：恢复码仅用于恢复“游客身份”，不会公开你的数据。</div>
+      <div class="spacer"></div>
+      <button id="btnGuestToolsCancel" class="btn">关闭</button>
+    </div>
+  </div>
+
 
   <script src="./app.js"></script>
 </body>

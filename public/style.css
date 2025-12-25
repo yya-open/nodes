@@ -291,14 +291,8 @@ body{
 }
 
 
-/* Admin tabs + notes list */
-.tabs{display:flex;gap:8px;margin-bottom:10px;}
-.tab{padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--text);cursor:pointer;}
-.tab.active{background:rgba(91,124,250,.22);border-color:rgba(91,124,250,.45);}
-.notesAdmin{display:flex;flex-direction:column;gap:10px;}
-.noteAdminItem{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.03);border-radius:14px;padding:12px 12px;}
-.noteAdminTop{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-.noteAdminTitle{font-weight:700;flex:1;min-width:160px;}
-.badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);}
-.badge.user{background:rgba(91,124,250,.18);border-color:rgba(91,124,250,.35);}
-.badge.guest{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14);}
+/* Admin tabs */
+.tabs{display:flex;gap:8px;padding:10px 16px 0 16px}
+.tab{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#dfe7ff;cursor:pointer}
+.tab.active{background:rgba(120,140,255,.22);border-color:rgba(120,140,255,.35)}
+.itemMeta{margin-top:6px;font-size:12px;opacity:.75}
