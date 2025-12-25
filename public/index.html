@@ -98,55 +98,13 @@
 
     <div class="modalFooter">
       <button id="btnDelete" class="btn danger hidden">删除</button>
-      <button id="btnShare" class="btn">分享</button>
       <div class="spacer"></div>
       <button id="btnCancel" class="btn">取消</button>
       <button id="btnSave" class="btn primary">保存</button>
     </div>
   </div>
 
-  
-  <!-- Share Modal -->
-  <div id="shareMask" class="mask hidden"></div>
-  <div id="shareModal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modalHeader">
-      <div class="modalTitle">分享</div>
-      <button id="btnShareCloseX" class="iconBtn" type="button" title="关闭">✕</button>
-    </div>
-    <div class="modalBody">
-      <label class="field">
-        <div class="label">有效期</div>
-        <select id="shareExpire" class="select">
-          <option value="3600">1 小时</option>
-          <option value="86400" selected>1 天</option>
-          <option value="604800">7 天</option>
-          <option value="0">永久</option>
-        </select>
-      </label>
-
-      <label class="field row" style="align-items:center; gap:10px;">
-        <input id="shareBurn" type="checkbox" />
-        <div>
-          <div class="label" style="margin:0;">阅后即焚</div>
-          <div class="smallmuted">打开一次后链接自动失效（不会删除原备忘录）。</div>
-        </div>
-      </label>
-
-      <div class="row" style="gap:10px; align-items:center;">
-        <input id="shareLink" class="input" readonly placeholder="点击生成后出现链接" />
-        <button id="btnShareCopy" class="btn" type="button">复制</button>
-      </div>
-
-      <div id="shareMsg" class="smallmuted"></div>
-    </div>
-    <div class="modalFooter">
-      <button id="btnShareCancel" class="btn" type="button">关闭</button>
-      <div class="spacer"></div>
-      <button id="btnShareGen" class="btn primary" type="button">生成链接</button>
-    </div>
-  </div>
-
-<!-- Login Modal -->
+  <!-- Login Modal -->
   <div id="loginMask" class="mask hidden"></div>
   <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modalHeader">
@@ -177,7 +135,7 @@
         <div class="smallmuted">管理员可在「用户管理」中创建/重置用户口令。</div>
       </div>
 
-      <div id="loginMsg" class="smallmuted"></div>
+      <div id="loginMsg" class="statusMsg"></div>
     </div>
 
     <div class="modalFooter">
@@ -216,7 +174,7 @@
 
       <div id="usersList" class="users"></div>
       <div id="usersEmpty" class="smallmuted hidden">暂无用户。</div>
-      <div id="adminMsg" class="smallmuted"></div>
+      <div id="adminMsg" class="statusMsg"></div>
     
       </div>
 
@@ -229,7 +187,7 @@
         </div>
         <div id="adminNotesList" class="list"></div>
         <div id="adminNotesEmpty" class="smallmuted hidden">暂无备忘录。</div>
-        <div id="adminNotesMsg" class="smallmuted"></div>
+        <div id="adminNotesMsg" class="statusMsg"></div>
       </div>
 
 </div>
@@ -282,7 +240,7 @@
         </div>
       </div>
 
-      <div id="guestToolsMsg" class="smallmuted"></div>
+      <div id="guestToolsMsg" class="statusMsg"></div>
     </div>
     <div class="modalFooter">
       <div class="smallmuted">提示：恢复码仅用于恢复“游客身份”，不会公开你的数据。</div>
