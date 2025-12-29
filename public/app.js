@@ -1291,9 +1291,14 @@ async function refreshAdminNotes(opts = { resetPage: false }) {
 
   try {
     const data = await api(`/api/admin/notes?${params.toString()}`, { method: "GET", signal: adminNotesAbort.signal });
-    adminNotes = data.items || data.notes || [];
-    adminNotesTotal = Number(data.total ?? (data.page?.total ?? adminNotes.length));
-    adminNotesLoaded = true;
+
+const list = Array.isArray(data.items) ? data.items
+           : Array.isArray(data.notes) ? data.notes
+           : [];
+adminNotes = list;
+adminNotesTotal = Number(data.total ?? data.page?.total ?? list.length);
+adminNotesPage = Number(data.pageNum ?? data.page?.pageNum ?? adminNotesPage ?? 1);
+adminNotesLoaded = true;
     adminNotesMsg.textContent = "";
 
     if (Array.isArray(data.owners)) rebuildAdminNotesOwners(data.owners);
@@ -1469,8 +1474,6 @@ if (adminNotesSearch) {
 if (adminNotesOwner) {
   adminNotesOwner.addEventListener("change", () => refreshAdminNotes({ resetPage: true }));
 }
-  adminNotesSearch.addEventListener("input", renderAdminNotes);
-  adminNotesOwner && adminNotesOwner.addEventListener("change", renderAdminNotes);
   btnAdminNoteViewClose && btnAdminNoteViewClose.addEventListener("click", closeAdminNoteView);
   btnAdminNoteViewX && btnAdminNoteViewX.addEventListener("click", closeAdminNoteView);
   adminNoteViewMask && adminNoteViewMask.addEventListener("click", closeAdminNoteView);
