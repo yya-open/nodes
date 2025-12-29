@@ -577,3 +577,8 @@ body{
 .pager .jump{
   width: 84px;
 }
+
+
+#loading{
+  margin-top: 8px;
+}
