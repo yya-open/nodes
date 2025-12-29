@@ -344,7 +344,6 @@ function bindPagerHandlers() {
 
 bindPagerHandlers();
 
-  bindAdminPagerHandlers();
 
   const whoEl = $("who");
   const btnSwitch = $("btnSwitch");
@@ -425,6 +424,7 @@ bindPagerHandlers();
   const aPgInfo = $("aPgInfo");
   const aPgJump = $("aPgJump");
   const aPgGo = $("aPgGo");
+  bindAdminPagerHandlers();
   const usersList = $("usersList");
   const usersEmpty = $("usersEmpty");
   const adminMsg = $("adminMsg");
