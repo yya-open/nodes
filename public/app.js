@@ -189,6 +189,75 @@
   const filterEl = $("filter");
   const sortEl = $("sort");
 
+
+// ---- pagination
+const pagerEl = $("pager");
+const pgFirst = $("pgFirst");
+const pgPrev = $("pgPrev");
+const pgNext = $("pgNext");
+const pgLast = $("pgLast");
+const pgInfo = $("pgInfo");
+const pgJump = $("pgJump");
+const pgGo = $("pgGo");
+
+const PAGE_SIZE = 10;
+let currentPage = 1;
+
+function getTotalPages(total) {
+  return Math.max(1, Math.ceil(total / PAGE_SIZE));
+}
+
+function updatePager(total) {
+  if (!pagerEl) return;
+  if (total <= PAGE_SIZE) {
+    pagerEl.classList.add("hidden");
+    return;
+  }
+  const totalPages = getTotalPages(total);
+  currentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  pagerEl.classList.remove("hidden");
+  if (pgInfo) pgInfo.textContent = `第 ${currentPage}/${totalPages} 页 · 共 ${total} 条`;
+
+  if (pgFirst) pgFirst.disabled = currentPage <= 1;
+  if (pgPrev) pgPrev.disabled = currentPage <= 1;
+  if (pgNext) pgNext.disabled = currentPage >= totalPages;
+  if (pgLast) pgLast.disabled = currentPage >= totalPages;
+
+  if (pgJump) {
+    pgJump.max = String(totalPages);
+    if (document.activeElement !== pgJump) pgJump.value = String(currentPage);
+  }
+}
+
+function bindPagerHandlers() {
+  if (!pagerEl) return;
+
+  const goTo = (p) => {
+    const totalPages = getTotalPages(memos.length);
+    currentPage = Math.min(Math.max(1, p), totalPages);
+    render();
+  };
+
+  pgFirst?.addEventListener("click", () => goTo(1));
+  pgPrev?.addEventListener("click", () => goTo(currentPage - 1));
+  pgNext?.addEventListener("click", () => goTo(currentPage + 1));
+  pgLast?.addEventListener("click", () => goTo(getTotalPages(memos.length)));
+
+  const doJump = () => {
+    const v = parseInt((pgJump?.value || "").trim(), 10);
+    if (!Number.isFinite(v)) return;
+    goTo(v);
+  };
+
+  pgGo?.addEventListener("click", doJump);
+  pgJump?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doJump();
+  });
+}
+
+bindPagerHandlers();
+
   const whoEl = $("who");
   const btnSwitch = $("btnSwitch");
   const btnLogout = $("btnLogout");
@@ -412,6 +481,7 @@
     });
     const data = await api(`/api/notes?${params.toString()}`);
     memos = data.items || [];
+    currentPage = 1;
     render();
   }
 
@@ -435,18 +505,32 @@
     statsEl.textContent = `共 ${total} 条 · 已完成 ${done} 条 · 置顶 ${pinned} 条 · 当前显示 ${filteredCount} 条`;
   }
 
-  function render() {
-    const items = memos.slice(); // server already filtered/sorted
-    listEl.innerHTML = "";
-    updateStats(items.length);
+  
+function render() {
+  const items = memos.slice(); // server already filtered/sorted
+  const total = items.length;
 
-    if (items.length === 0) {
+  // clamp page
+  const totalPages = getTotalPages(total);
+  currentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = start + PAGE_SIZE;
+  const pageItems = items.slice(start, end);
+
+  listEl.innerHTML = "";
+  updateStats(total);
+  updatePager(total);
+
+
+    if (total === 0) {
       emptyEl.classList.remove("hidden");
+      if (pagerEl) pagerEl.classList.add("hidden");
       return;
     }
     emptyEl.classList.add("hidden");
 
-    for (const x of items) {
+    for (const x of pageItems) {
       const card = document.createElement("div");
       card.className = "card";
       card.dataset.id = x.id;
@@ -556,7 +640,14 @@
       card.appendChild(content);
       card.appendChild(right);
       card.addEventListener("click", () => openMemoModal(x.id));
-      listEl.appendChild(card);
+listEl.appendChild(card);
+
+// 仅在内容被截断时启用底部渐隐（避免短内容出现“变色”）
+requestAnimationFrame(() => {
+  const overflow = body.scrollHeight > body.clientHeight + 1;
+  body.classList.toggle("fade", overflow);
+});
+
     }
   }
 
