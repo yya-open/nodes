@@ -800,7 +800,6 @@ requestAnimationFrame(() => {
 }
 
 async function importJson(file) {
-(file) {
     const text = await file.text();
     let arr;
     try {
