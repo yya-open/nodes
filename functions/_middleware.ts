@@ -1,4 +1,5 @@
 import type { Env } from "./lib/db";
+import { err } from "./lib/response";
 import { runShareCleanupMaybe } from "./lib/share_cleanup";
 
 /**
@@ -21,5 +22,16 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     );
   }
 
-  return ctx.next();
+  // ✅ Ensure API always returns JSON on errors
+  try {
+    return await ctx.next();
+  } catch (e: any) {
+    if (url.pathname.startsWith("/api/")) {
+      const msg = e?.message ? String(e.message) : "服务器异常";
+      const status = /Content-Type|必须为 application\/json/i.test(msg) ? 400 : 500;
+      // hide stack/details
+      return err(status, msg);
+    }
+    throw e;
+  }
 };

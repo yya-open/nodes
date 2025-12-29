@@ -1,19 +1,33 @@
 (() => {
   // ---- API
   async function api(path, opts = {}) {
-    const res = await fetch(path, {
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
-      ...opts,
-    });
-    const ct = res.headers.get("content-type") || "";
-    const data = ct.includes("application/json") ? await res.json() : await res.text();
-    if (!res.ok) {
-      const msg = (data && data.error) ? data.error : (typeof data === "string" ? data : JSON.stringify(data));
-      throw new Error(msg || `HTTP ${res.status}`);
-    }
-    return data;
+  const res = await fetch(path, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    ...opts,
+  });
+
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  let data;
+  if (ct.includes("application/json")) {
+    data = await res.json().catch(() => null);
+  } else {
+    data = await res.text().catch(() => "");
   }
+
+  if (!res.ok) {
+    // Avoid dumping HTML error pages to the UI.
+    const isHtml = typeof data === "string" && /<\s*html|<!doctype/i.test(data);
+    const msg =
+      (data && typeof data === "object" && data.error) ? data.error :
+      isHtml ? `服务异常（HTTP ${res.status}）` :
+      (typeof data === "string" ? data : JSON.stringify(data));
+
+    throw new Error(msg || `HTTP ${res.status}`);
+  }
+
+  return data;
+}
 
   // ---- utils
   const nowISO = () => new Date().toISOString();
@@ -24,6 +38,15 @@
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     } catch { return iso; }
   };
+
+
+function debounce(fn, wait = 300) {
+  let t = null;
+  return (...args) => {
+    if (t) clearTimeout(t);
+    t = setTimeout(() => fn(...args), wait);
+  };
+}
 
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<"'>]/g, (c) => ({
@@ -44,6 +67,8 @@
   // ---- state
   let me = { authenticated: false, role: "none" };
   let memos = [];
+  let totalMemos = 0;
+  let notesAbort = null;
   let editingId = null;
 
   let adminNotes = [];
@@ -232,17 +257,16 @@ function updatePager(total) {
 
 function bindPagerHandlers() {
   if (!pagerEl) return;
-
-  const goTo = (p) => {
-    const totalPages = getTotalPages(memos.length);
+  const goTo = async (p) => {
+    const totalPages = getTotalPages(totalMemos);
     currentPage = Math.min(Math.max(1, p), totalPages);
-    render();
+    await loadNotes();
   };
 
   pgFirst?.addEventListener("click", () => goTo(1));
   pgPrev?.addEventListener("click", () => goTo(currentPage - 1));
   pgNext?.addEventListener("click", () => goTo(currentPage + 1));
-  pgLast?.addEventListener("click", () => goTo(getTotalPages(memos.length)));
+  pgLast?.addEventListener("click", () => goTo(getTotalPages(totalMemos)));
 
   const doJump = () => {
     const v = parseInt((pgJump?.value || "").trim(), 10);
@@ -472,18 +496,46 @@ bindPagerHandlers();
   }
 
   // ---- notes API
-  async function loadNotes() {
-    if (!me.authenticated) return;
-    const params = new URLSearchParams({
-      q: (qEl.value || "").trim(),
-      filter: filterEl.value,
-      sort: sortEl.value,
-    });
-    const data = await api(`/api/notes?${params.toString()}`);
+  async function loadNotes(opts = { resetPage: false }) {
+  if (!me.authenticated) return;
+
+  if (opts?.resetPage) currentPage = 1;
+
+  // cancel previous in-flight request
+  try { notesAbort?.abort(); } catch {}
+  notesAbort = new AbortController();
+
+  const params = new URLSearchParams({
+    q: (qEl.value || "").trim(),
+    filter: filterEl.value,
+    sort: sortEl.value,
+    page: String(currentPage),
+    pageSize: String(PAGE_SIZE),
+  });
+
+  try {
+    const data = await api(`/api/notes?${params.toString()}`, { signal: notesAbort.signal });
     memos = data.items || [];
-    currentPage = 1;
+    totalMemos = Number(data.total ?? memos.length);
+
+          // clamp page if data size changed (e.g. deleted last item on last page)
+          const totalPages = getTotalPages(totalMemos);
+          if (currentPage > totalPages) {
+            currentPage = totalPages;
+            await loadNotes();
+            return;
+          }
+
+
+    if (data.page) currentPage = Number(data.page);
+
     render();
+  } catch (e) {
+    if (e?.name === "AbortError") return;
+    throw e;
   }
+}
+
 
   async function createNote(note) {
     const data = await api("/api/notes", { method: "POST", body: JSON.stringify(note) });
@@ -498,39 +550,29 @@ bindPagerHandlers();
   }
 
   // ---- UI render
-  function updateStats(filteredCount) {
-    const total = memos.length;
-    const done = memos.filter(x => x.done).length;
-    const pinned = memos.filter(x => x.pinned).length;
-    statsEl.textContent = `共 ${total} 条 · 已完成 ${done} 条 · 置顶 ${pinned} 条 · 当前显示 ${filteredCount} 条`;
-  }
+  function updateStats(total) {
+  const pageCount = memos.length;
+  const done = memos.filter(x => x.done).length;
+  const pinned = memos.filter(x => x.pinned).length;
+  statsEl.textContent = `共 ${total} 条 · 当前页 ${pageCount} 条 · 当前页已完成 ${done} 条 · 当前页置顶 ${pinned} 条`;
+}
+
 
   
 function render() {
-  const items = memos.slice(); // server already filtered/sorted
-  const total = items.length;
-
-  // clamp page
-  const totalPages = getTotalPages(total);
-  currentPage = Math.min(Math.max(1, currentPage), totalPages);
-
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const end = start + PAGE_SIZE;
-  const pageItems = items.slice(start, end);
-
   listEl.innerHTML = "";
-  updateStats(total);
-  updatePager(total);
+  updateStats(totalMemos);
+  updatePager(totalMemos);
 
+  if (totalMemos === 0) {
+    emptyEl.classList.remove("hidden");
+    if (pagerEl) pagerEl.classList.add("hidden");
+    return;
+  }
+  emptyEl.classList.add("hidden");
 
-    if (total === 0) {
-      emptyEl.classList.remove("hidden");
-      if (pagerEl) pagerEl.classList.add("hidden");
-      return;
-    }
-    emptyEl.classList.add("hidden");
+  for (const x of memos) {
 
-    for (const x of pageItems) {
       const card = document.createElement("div");
       card.className = "card";
       card.dataset.id = x.id;
@@ -598,7 +640,7 @@ function render() {
         span.addEventListener("click", async (e) => {
           e.stopPropagation();
           qEl.value = tag;
-          await loadNotes();
+          await loadNotes({ resetPage: true });
         });
         tagsWrap.appendChild(span);
       });
@@ -722,21 +764,43 @@ requestAnimationFrame(() => {
 
   // ---- Import/Export (client-side file, server-side store)
   async function exportJson() {
-    const params = new URLSearchParams({ q: "", filter: "all", sort: "updated_desc" });
+  const q = "";
+  const filter = "all";
+  const sort = "updated_desc";
+
+  let page = 1;
+  const pageSize = 100;
+  const all = [];
+
+  while (true) {
+    const params = new URLSearchParams({
+      q, filter, sort,
+      page: String(page),
+      pageSize: String(pageSize),
+    });
     const data = await api(`/api/notes?${params.toString()}`);
-    const content = JSON.stringify(data.items || [], null, 2);
-    const blob = new Blob([content], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `memos_${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const items = data.items || [];
+    all.push(...items);
+
+    const total = Number(data.total ?? all.length);
+    if (all.length >= total || items.length === 0) break;
+    page++;
   }
 
-  async function importJson(file) {
+  const content = JSON.stringify(all, null, 2);
+  const blob = new Blob([content], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `memos_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importJson(file) {
+(file) {
     const text = await file.text();
     let arr;
     try {
@@ -1272,9 +1336,10 @@ $("btnCancel").addEventListener("click", closeMemoModal);
   maskEl.addEventListener("click", closeMemoModal);
 
   // search/filter/sort
-  qEl.addEventListener("input", () => loadNotes());
-  filterEl.addEventListener("change", () => loadNotes());
-  sortEl.addEventListener("change", () => loadNotes());
+  const debouncedSearch = debounce(() => loadNotes({ resetPage: true }), 300);
+  qEl.addEventListener("input", debouncedSearch);
+  filterEl.addEventListener("change", () => loadNotes({ resetPage: true }));
+  sortEl.addEventListener("change", () => loadNotes({ resetPage: true }));
 
   // login modal events
   $("btnSwitch").addEventListener("click", openLogin);

@@ -50,6 +50,12 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const q = (url.searchParams.get("q") || "").trim();
   const filter = (url.searchParams.get("filter") || "all").trim();
   const sort = (url.searchParams.get("sort") || "updated_desc").trim();
+// ✅ pagination
+const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+const pageSizeRaw = parseInt(url.searchParams.get("pageSize") || "10", 10) || 10;
+const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
+const offset = (page - 1) * pageSize;
+
 
   // ownership
   let ownerType: "user" | "guest";
@@ -74,20 +80,29 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   if (filter === "pinned") where.push("pinned = 1");
 
   if (q) {
-    where.push("(title LIKE ? OR body LIKE ? OR tags LIKE ?)");
+    where.push("(title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')");
     const like = `%${q.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
     params.push(like, like, like);
   }
 
-  const sql = `
-    SELECT id, title, body, tags, done, pinned, created_at, updated_at
-    FROM notes
-    WHERE ${where.join(" AND ")}
-    ORDER BY ${sortSql(sort)}
-    LIMIT 500
-  `;
-  const rows = await dbAll<any>(ctx.env.DB, sql, params);
-  return json({ items: rows.map(fromRow) });
+// total
+const countSql = `
+  SELECT COUNT(1) AS cnt
+  FROM notes
+  WHERE ${where.join(" AND ")}
+`;
+const countRows = await dbAll<any>(ctx.env.DB, countSql, params);
+const total = Number(countRows?.[0]?.cnt || 0);
+
+const sql = `
+  SELECT id, title, body, tags, done, pinned, created_at, updated_at
+  FROM notes
+  WHERE ${where.join(" AND ")}
+  ORDER BY ${sortSql(sort)}
+  LIMIT ? OFFSET ?
+`;
+const rows = await dbAll<any>(ctx.env.DB, sql, [...params, pageSize, offset]);
+return json({ items: rows.map(fromRow), total, page, pageSize });
 };
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
