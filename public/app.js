@@ -40,6 +40,9 @@
   };
 
 
+const CONFIG = (typeof window !== "undefined" && window.APP_CONFIG) ? window.APP_CONFIG : {};
+const SEARCH_DEBOUNCE_MS = Number(CONFIG?.searchDebounceMs ?? 300);
+
 function debounce(fn, wait = 300) {
   let t = null;
   return (...args) => {
@@ -69,9 +72,15 @@ function debounce(fn, wait = 300) {
   let memos = [];
   let totalMemos = 0;
   let notesAbort = null;
+  let notesReqSeq = 0;
   let editingId = null;
 
   let adminNotes = [];
+  let adminTotal = 0;
+  let adminAbort = null;
+  let adminReqSeq = 0;
+  let adminPage = 1;
+  const ADMIN_PAGE_SIZE = 10;
   let adminNotesLoaded = false;
 
   // ---- message UI
@@ -81,6 +90,13 @@ function debounce(fn, wait = 300) {
     el.classList.remove("ok", "error", "warn");
     if (kind) el.classList.add(kind);
   }
+
+
+function setLoading(on, text = "加载中…") {
+  if (!loadingEl) return;
+  loadingEl.textContent = on ? text : "";
+  loadingEl.classList.toggle("hidden", !on);
+}
 
   function clearLoginForm() {
     if (loginUser) loginUser.value = "";
@@ -213,6 +229,7 @@ function debounce(fn, wait = 300) {
   const qEl = $("q");
   const filterEl = $("filter");
   const sortEl = $("sort");
+  const loadingEl = $("loading");
 
 
 // ---- pagination
@@ -281,6 +298,7 @@ function bindPagerHandlers() {
 }
 
 bindPagerHandlers();
+  bindAdminPagerHandlers();
 
   const whoEl = $("who");
   const btnSwitch = $("btnSwitch");
@@ -353,6 +371,14 @@ bindPagerHandlers();
   const adminNotesList = $("adminNotesList");
   const adminNotesEmpty = $("adminNotesEmpty");
   const adminNotesMsg = $("adminNotesMsg");
+  const adminPagerEl = $("adminPager");
+  const adminPgFirst = $("adminPgFirst");
+  const adminPgPrev = $("adminPgPrev");
+  const adminPgNext = $("adminPgNext");
+  const adminPgLast = $("adminPgLast");
+  const adminPgInfo = $("adminPgInfo");
+  const adminPgJump = $("adminPgJump");
+  const adminPgGo = $("adminPgGo");
   const usersList = $("usersList");
   const usersEmpty = $("usersEmpty");
   const adminMsg = $("adminMsg");
@@ -504,6 +530,9 @@ bindPagerHandlers();
   // cancel previous in-flight request
   try { notesAbort?.abort(); } catch {}
   notesAbort = new AbortController();
+  const reqId = ++notesReqSeq;
+
+  setLoading(true);
 
   const params = new URLSearchParams({
     q: (qEl.value || "").trim(),
@@ -518,14 +547,13 @@ bindPagerHandlers();
     memos = data.items || [];
     totalMemos = Number(data.total ?? memos.length);
 
-          // clamp page if data size changed (e.g. deleted last item on last page)
-          const totalPages = getTotalPages(totalMemos);
-          if (currentPage > totalPages) {
-            currentPage = totalPages;
-            await loadNotes();
-            return;
-          }
-
+    // clamp page if data size changed (e.g. deleted last item on last page)
+    const totalPages = getTotalPages(totalMemos);
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
+      await loadNotes({ resetPage: false });
+      return;
+    }
 
     if (data.page) currentPage = Number(data.page);
 
@@ -533,11 +561,12 @@ bindPagerHandlers();
   } catch (e) {
     if (e?.name === "AbortError") return;
     throw e;
+  } finally {
+    if (reqId === notesReqSeq) setLoading(false);
   }
 }
 
-
-  async function createNote(note) {
+async function createNote(note) {
     const data = await api("/api/notes", { method: "POST", body: JSON.stringify(note) });
     return data.item;
   }
@@ -764,9 +793,9 @@ requestAnimationFrame(() => {
 
   // ---- Import/Export (client-side file, server-side store)
   async function exportJson() {
-  const q = "";
-  const filter = "all";
-  const sort = "updated_desc";
+  const q = (qEl?.value || "").trim();
+  const filter = filterEl?.value || "all";
+  const sort = sortEl?.value || "updated_desc";
 
   let page = 1;
   const pageSize = 100;
@@ -1149,75 +1178,186 @@ function closeAdminNoteView() {
   if (modal) modal.classList.add("hidden");
 }
 
-  function renderAdminNotes() {
-    const q = (adminNotesSearch.value || "").trim().toLowerCase();
-    const ownerSel = (adminNotesOwner && adminNotesOwner.value) ? adminNotesOwner.value.trim() : "";
-    const list = (adminNotes || []).filter((n) => {
-      if (ownerSel && String(n.ownerId || "") !== ownerSel) return false;
-      if (!q) return true;
-      const hay = `${n.title || ""} ${n.body || ""} ${n.ownerUsername || ""} ${n.ownerId || ""}`.toLowerCase();
-      return hay.includes(q);
+  
+function renderAdminNotes() {
+  const list = adminNotes || [];
+
+  adminNotesList.innerHTML = "";
+  adminNotesEmpty.classList.toggle("hidden", adminTotal !== 0);
+  updateAdminPager(adminTotal);
+
+  if (list.length === 0) return;
+
+  for (const n of list) {
+    const row = document.createElement("div");
+    row.className = "userRow";
+
+    const main = document.createElement("div");
+    main.className = "adminNoteMain";
+
+    const title = document.createElement("div");
+    title.className = "adminNoteTitle";
+    title.textContent = n.title || "(无标题)";
+
+    const snippet = document.createElement("div");
+    snippet.className = "adminNoteSnippet";
+    snippet.textContent = (n.body || "").slice(0, 120);
+
+    const meta = document.createElement("div");
+    meta.className = "adminNoteMeta";
+    meta.textContent = `${ownerLabel(n)} · 更新：${formatTime(n.updatedAt || n.updated_at || "")}`;
+
+    main.appendChild(title);
+    main.appendChild(snippet);
+    main.appendChild(meta);
+
+    const spacer = document.createElement("div");
+    spacer.className = "spacer";
+
+    const btn = document.createElement("button");
+    btn.className = "btn small";
+    btn.textContent = "查看";
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openAdminNoteView(n);
     });
 
-    adminNotesList.innerHTML = "";
-    adminNotesEmpty.classList.toggle("hidden", list.length !== 0);
-    if (list.length === 0) return;
+    row.appendChild(main);
+    row.appendChild(spacer);
+    row.appendChild(btn);
+    adminNotesList.appendChild(row);
+  }
+}
 
-    for (const n of list) {
-      const row = document.createElement("div");
-      row.className = "userRow";
 
-      const main = document.createElement("div");
-      main.className = "adminNoteMain";
 
-      const title = document.createElement("div");
-      title.className = "adminNoteTitle";
-      title.textContent = n.title || "(无标题)";
 
-      const snippet = document.createElement("div");
-      snippet.className = "adminNoteSnippet";
-      snippet.textContent = (n.body || "").slice(0, 120);
+function updateAdminPager(total) {
+  if (!adminPagerEl) return;
+  if (total <= ADMIN_PAGE_SIZE) {
+    adminPagerEl.classList.add("hidden");
+    return;
+  }
+  const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+  adminPage = Math.min(Math.max(1, adminPage), totalPages);
 
-      const meta = document.createElement("div");
-      meta.className = "smallmuted";
-      meta.textContent = `创建者：${ownerLabel(n)} · 更新：${formatTime(n.updatedAt || "")}`;
+  adminPagerEl.classList.remove("hidden");
+  if (adminPgInfo) adminPgInfo.textContent = `第 ${adminPage}/${totalPages} 页 · 共 ${total} 条`;
 
-      main.appendChild(title);
-      main.appendChild(snippet);
-      main.appendChild(meta);
+  if (adminPgFirst) adminPgFirst.disabled = adminPage <= 1;
+  if (adminPgPrev) adminPgPrev.disabled = adminPage <= 1;
+  if (adminPgNext) adminPgNext.disabled = adminPage >= totalPages;
+  if (adminPgLast) adminPgLast.disabled = adminPage >= totalPages;
 
-      const spacer = document.createElement("div");
-      spacer.className = "spacer";
+  if (adminPgJump) {
+    adminPgJump.max = String(totalPages);
+    if (document.activeElement !== adminPgJump) adminPgJump.value = String(adminPage);
+  }
+}
 
-      const btn = document.createElement("button");
-      btn.className = "btn small";
-      btn.type = "button";
-      btn.textContent = "查看全文";
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        openAdminNoteView(n);
-      });
+function bindAdminPagerHandlers() {
+  if (!adminPagerEl) return;
 
-      row.appendChild(main);
-      row.appendChild(spacer);
-      row.appendChild(btn);
-      adminNotesList.appendChild(row);
-    }
+  const goTo = async (p) => {
+    const totalPages = Math.max(1, Math.ceil(adminTotal / ADMIN_PAGE_SIZE));
+    adminPage = Math.min(Math.max(1, p), totalPages);
+    await loadAdminNotes({ resetPage: false });
+  };
+
+  adminPgFirst?.addEventListener("click", () => goTo(1));
+  adminPgPrev?.addEventListener("click", () => goTo(adminPage - 1));
+  adminPgNext?.addEventListener("click", () => goTo(adminPage + 1));
+  adminPgLast?.addEventListener("click", () => goTo(Math.max(1, Math.ceil(adminTotal / ADMIN_PAGE_SIZE))));
+
+  const doJump = () => {
+    const v = parseInt((adminPgJump?.value || "").trim(), 10);
+    if (!Number.isFinite(v)) return;
+    goTo(v);
+  };
+
+  adminPgGo?.addEventListener("click", doJump);
+  adminPgJump?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doJump();
+  });
+}
+
+function rebuildAdminNotesOwnersFrom(owners) {
+  if (!adminNotesOwner) return;
+  const prev = (adminNotesOwner.value || "").trim();
+  const map = new Map();
+
+  for (const n of (owners || [])) {
+    const id = String(n.ownerId || "").trim();
+    if (!id) continue;
+    map.set(id, ownerLabel(n));
   }
 
+  adminNotesOwner.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value = "";
+  optAll.textContent = "所有创建者";
+  adminNotesOwner.appendChild(optAll);
 
+  const items = Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "zh"));
+  for (const [id, label] of items) {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = label;
+    adminNotesOwner.appendChild(opt);
+  }
+  adminNotesOwner.value = prev && map.has(prev) ? prev : "";
+}
+
+async function loadAdminNotes(opts = { resetPage: false }) {
+  if (!me?.authenticated) return;
+  if (me.role !== "admin") return;
+
+  if (opts?.resetPage) adminPage = 1;
+
+  // cancel previous in-flight request
+  try { adminAbort?.abort(); } catch {}
+  adminAbort = new AbortController();
+  const reqId = ++adminReqSeq;
+
+  const q = (adminNotesSearch?.value || "").trim();
+  const ownerId = (adminNotesOwner?.value || "").trim();
+
+  adminNotesMsg.textContent = "加载中…";
+
+  const params = new URLSearchParams({
+    q,
+    ownerId,
+    page: String(adminPage),
+    pageSize: String(ADMIN_PAGE_SIZE),
+  });
+
+  try {
+    const data = await api(`/api/admin/notes?${params.toString()}`, { method: "GET", signal: adminAbort.signal });
+    adminNotes = data.items || data.notes || [];
+    adminTotal = Number(data.total ?? data.page?.total ?? adminNotes.length);
+
+// clamp page if data size changed
+const totalPages = Math.max(1, Math.ceil(adminTotal / ADMIN_PAGE_SIZE));
+if (adminPage > totalPages) {
+  adminPage = totalPages;
+  await loadAdminNotes({ resetPage: false });
+  return;
+}
+
+    // owners list for dropdown
+    if (Array.isArray(data.owners)) rebuildAdminNotesOwnersFrom(data.owners);
+    else rebuildAdminNotesOwners(); // fallback
+
+    adminNotesLoaded = true;
+    adminNotesMsg.textContent = "";
+    renderAdminNotes();
+  } catch (e) {
+    if (e?.name === "AbortError") return;
+    if (reqId === adminReqSeq) adminNotesMsg.textContent = "加载失败：" + (e.message || e);
+  }
+}
 async function refreshAdminNotes() {
-    adminNotesMsg.textContent = "加载中…";
-    try {
-      const data = await api("/api/admin/notes", { method: "GET" });
-      adminNotes = data.notes || data || [];
-      adminNotesLoaded = true;
-      adminNotesMsg.textContent = "";
-      rebuildAdminNotesOwners();
-      renderAdminNotes();
-    } catch (e) {
-      adminNotesMsg.textContent = "加载失败：" + (e.message || e);
-    }
+    await loadAdminNotes({ resetPage: true });
   }
 
   async function createUser() {
@@ -1335,8 +1475,9 @@ $("btnCancel").addEventListener("click", closeMemoModal);
   maskEl.addEventListener("click", closeMemoModal);
 
   // search/filter/sort
-  const debouncedSearch = debounce(() => loadNotes({ resetPage: true }), 300);
+  const debouncedSearch = debounce(() => loadNotes({ resetPage: true }), SEARCH_DEBOUNCE_MS);
   qEl.addEventListener("input", debouncedSearch);
+  qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") loadNotes({ resetPage: true }); });
   filterEl.addEventListener("change", () => loadNotes({ resetPage: true }));
   sortEl.addEventListener("change", () => loadNotes({ resetPage: true }));
 
@@ -1376,8 +1517,10 @@ $("btnCancel").addEventListener("click", closeMemoModal);
   $("btnCreateUser").addEventListener("click", createUser);
   // admin notes events
   btnAdminNotesRefresh.addEventListener("click", refreshAdminNotes);
-  adminNotesSearch.addEventListener("input", renderAdminNotes);
-  adminNotesOwner && adminNotesOwner.addEventListener("change", renderAdminNotes);
+  const debouncedAdminSearch = debounce(() => loadAdminNotes({ resetPage: true }), SEARCH_DEBOUNCE_MS);
+  adminNotesSearch.addEventListener("input", debouncedAdminSearch);
+  adminNotesSearch.addEventListener("keydown", (e) => { if (e.key === "Enter") loadAdminNotes({ resetPage: true }); });
+  adminNotesOwner && adminNotesOwner.addEventListener("change", () => loadAdminNotes({ resetPage: true }));
   btnAdminNoteViewClose && btnAdminNoteViewClose.addEventListener("click", closeAdminNoteView);
   btnAdminNoteViewX && btnAdminNoteViewX.addEventListener("click", closeAdminNoteView);
   adminNoteViewMask && adminNoteViewMask.addEventListener("click", closeAdminNoteView);

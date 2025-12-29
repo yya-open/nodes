@@ -52,6 +52,8 @@
 
       <div id="stats" class="stats"></div>
 
+      <div id="loading" class="smallmuted hidden"></div>
+
       <div id="list" class="list"></div>
       <div id="empty" class="empty hidden">
         <div class="emptyTitle">还没有备忘录</div>
@@ -239,6 +241,15 @@
         </div>
         <div id="adminNotesList" class="list"></div>
         <div id="adminNotesEmpty" class="smallmuted hidden">暂无备忘录。</div>
+<div id="adminPager" class="pager hidden" aria-label="管理员备忘录分页">
+  <button id="adminPgFirst" class="btn small" type="button">首页</button>
+  <button id="adminPgPrev" class="btn small" type="button">上一页</button>
+  <div id="adminPgInfo" class="pgInfo"></div>
+  <button id="adminPgNext" class="btn small" type="button">下一页</button>
+  <button id="adminPgLast" class="btn small" type="button">末页</button>
+  <input id="adminPgJump" class="input jump" type="number" min="1" step="1" placeholder="页码">
+  <button id="adminPgGo" class="btn small" type="button">跳转</button>
+</div>
         <div id="adminNotesMsg" class="statusMsg"></div>
         <div class="row" style="justify-content:flex-end;gap:10px;">
           <div id="adminNotesMoreMsg" class="smallmuted"></div>
@@ -343,6 +354,11 @@
 
   <!-- Toast -->
   <div id="toastHost" class="toastHost" aria-live="polite" aria-atomic="true"></div>
-  <script src="./app.js"></script>
+  <script>
+  // 可在部署后按需修改：搜索防抖时间（毫秒）
+  window.APP_CONFIG = window.APP_CONFIG || {};
+  window.APP_CONFIG.searchDebounceMs = 300;
+</script>
+<script src="./app.js"></script>
 </body>
 </html>
