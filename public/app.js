@@ -48,6 +48,11 @@ function debounce(fn, wait = 300) {
   };
 }
 
+  // 搜索防抖（可通过 index.html 的 window.APP_CONFIG.searchDebounceMs 配置）
+  const SEARCH_DEBOUNCE_MS = (window.APP_CONFIG && typeof window.APP_CONFIG.searchDebounceMs === "number")
+    ? window.APP_CONFIG.searchDebounceMs
+    : 300;
+
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<"'>]/g, (c) => ({
       "&": "&amp;",
@@ -1415,7 +1420,7 @@ $("btnCancel").addEventListener("click", closeMemoModal);
   maskEl.addEventListener("click", closeMemoModal);
 
   // search/filter/sort
-  const debouncedSearch = debounce(() => loadNotes({ resetPage: true }), 300);
+  const debouncedSearch = debounce(() => loadNotes({ resetPage: true }), SEARCH_DEBOUNCE_MS);
   qEl.addEventListener("input", debouncedSearch);
   filterEl.addEventListener("change", () => loadNotes({ resetPage: true }));
   sortEl.addEventListener("change", () => loadNotes({ resetPage: true }));
