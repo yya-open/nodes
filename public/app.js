@@ -959,7 +959,7 @@ async function importJson(file) {
 
       for (const u of users) {
         const row = document.createElement("div");
-        row.className = "userRow";
+        row.className = "adminNoteRow userRow";
 
         const name = document.createElement("div");
         name.className = "u";
